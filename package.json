@@ -1,0 +1,55 @@
+{
+  "name": "swim-lessons-platform",
+  "version": "0.1.0",
+  "description": "Multi-tenant swim lesson discovery platform with city-pluggable architecture",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,json,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,json,md}\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:integration": "vitest run tests/integration",
+    "test:e2e": "playwright test",
+    "deploy:infra": "cd infrastructure-as-code && ./scripts/deploy.sh",
+    "deploy:functions": "echo 'Deploy functions to Azure'",
+    "deploy:web": "echo 'Deploy web app to Azure Static Web App'"
+  },
+  "dependencies": {
+    "@azure/cosmos": "^4.0.0",
+    "@azure/identity": "^4.0.0",
+    "@azure/keyvault-secrets": "^4.8.0",
+    "@azure/app-configuration": "^1.5.0",
+    "@azure/functions": "^4.5.0",
+    "applicationinsights": "^2.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@vitest/coverage-v8": "^1.2.0",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.2.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.2.0",
+    "@playwright/test": "^1.41.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "swim-lessons",
+    "discovery-platform",
+    "multi-tenant",
+    "azure",
+    "serverless"
+  ],
+  "author": "SwimLessons Team",
+  "license": "MIT"
+}

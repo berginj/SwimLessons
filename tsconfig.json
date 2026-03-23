@@ -1,0 +1,59 @@
+{
+  "compilerOptions": {
+    /* Language and Environment */
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "node",
+
+    /* Type Checking */
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+
+    /* Emit */
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "removeComments": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* Interop Constraints */
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+
+    /* Skip Library Check */
+    "skipLibCheck": true,
+
+    /* Path Mapping */
+    "baseUrl": "./src",
+    "paths": {
+      "@core/*": ["core/*"],
+      "@adapters/*": ["adapters/*"],
+      "@services/*": ["services/*"],
+      "@infrastructure/*": ["infrastructure/*"],
+      "@functions/*": ["functions/*"]
+    }
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests"
+  ]
+}
