@@ -1,0 +1,15 @@
+{
+  "name": "scripts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seed": "tsx seed-nyc-config.ts",
+    "demo": "tsx demo-search.ts"
+  },
+  "dependencies": {
+    "@azure/cosmos": "^4.0.0",
+    "dotenv": "^16.4.0",
+    "tsx": "^4.7.0"
+  }
+}

@@ -50,6 +50,7 @@ export function getEnvBoolean(key: string, defaultValue: boolean): boolean {
 export interface EnvironmentConfig {
   environment: 'development' | 'staging' | 'production';
   cosmosConnectionString: string;
+  cosmosDatabaseId: string;
   appConfigEndpoint: string;
   keyVaultName: string;
   applicationInsightsConnectionString?: string;
@@ -68,8 +69,16 @@ export function loadEnvironmentConfig(): EnvironmentConfig {
   return {
     environment: env,
     cosmosConnectionString: getEnvRequired('COSMOS_CONNECTION_STRING'),
+    cosmosDatabaseId: getEnvOptional('COSMOS_DATABASE_ID', 'swim-lessons-db'),
     appConfigEndpoint: getEnvRequired('APP_CONFIG_ENDPOINT'),
     keyVaultName: getEnvRequired('KEY_VAULT_NAME'),
     applicationInsightsConnectionString: getEnvOptional('APPLICATIONINSIGHTS_CONNECTION_STRING', ''),
   };
+}
+
+/**
+ * Get environment configuration (alias for loadEnvironmentConfig)
+ */
+export function getEnvironmentConfig(): EnvironmentConfig {
+  return loadEnvironmentConfig();
 }
