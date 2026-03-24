@@ -114,7 +114,7 @@
 - [x] Includes Azure Key Vault SDK
 - [x] Dev dependencies for TypeScript and testing
 - [x] Build and start scripts defined
-- [x] Node.js 18+ specified as requirement
+- [x] Node.js 22 specified as requirement
 
 ### 7. Environment Configuration Updates ✓
 **File:** `src/core/utils/env.ts`

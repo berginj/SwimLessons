@@ -181,7 +181,7 @@ interface DependencyContainer {
 - `test`: Run tests
 - `test:watch`: Watch mode testing
 
-**Environment:** Node.js 18+, ES modules
+**Environment:** Node.js 22, ES modules
 
 ---
 

@@ -20,7 +20,7 @@
 
 2. ✅ **func-swim-r5bmpt** - Function App
    - URL: https://func-swim-r5bmpt.azurewebsites.net
-   - Runtime: Node.js 18
+   - Runtime: Node.js 22
    - Code: Ready in function-deploy/ folder
 
 3. ✅ **swa-swim-r5bmpt** - Static Web App

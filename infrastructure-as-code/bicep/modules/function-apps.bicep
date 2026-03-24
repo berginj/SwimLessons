@@ -78,7 +78,7 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
     serverFarmId: appServicePlan.id
     httpsOnly: true
     siteConfig: {
-      linuxFxVersion: 'NODE|18'
+      linuxFxVersion: 'NODE|22'
       appSettings: [
         {
           name: 'AzureWebJobsStorage'

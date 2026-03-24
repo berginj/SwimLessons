@@ -33,7 +33,7 @@ This platform helps parents rapidly find age-appropriate swim lessons near them,
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 18+
+- Node.js 22
 - Azure CLI
 - Azure subscription
 - Git

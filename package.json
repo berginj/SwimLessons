@@ -30,7 +30,7 @@
     "applicationinsights": "^2.9.0"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
+    "@types/node": "^22.0.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "@vitest/coverage-v8": "^1.2.0",
@@ -42,7 +42,7 @@
     "@playwright/test": "^1.41.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0 <23"
   },
   "keywords": [
     "swim-lessons",
