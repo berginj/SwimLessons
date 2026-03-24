@@ -192,7 +192,7 @@ az deployment group show --name "deploy-XXXXX" --resource-group "pools-dev-rg" -
 2. **Create .env file**
 ```bash
 # Outputs will include:
-# - cosmosDbConnectionString
+# - cosmosDbAccountName
 # - appConfigEndpoint
 # - keyVaultName
 # - functionAppUrl

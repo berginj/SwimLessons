@@ -40,4 +40,3 @@ output url string = 'https://${staticWebApp.properties.defaultHostname}'
 output defaultHostname string = staticWebApp.properties.defaultHostname
 output staticWebAppName string = staticWebApp.name
 output staticWebAppId string = staticWebApp.id
-output deploymentToken string = staticWebApp.listSecrets().properties.apiKey

@@ -77,10 +77,17 @@ Write-Host ""
 Write-Host "📊 Deployment Outputs:" -ForegroundColor Cyan
 Write-Host ""
 
-$CosmosConnectionString = az deployment group show `
+$CosmosAccountName = az deployment group show `
     --name $DeploymentName `
     --resource-group $ResourceGroup `
-    --query properties.outputs.cosmosDbConnectionString.value `
+    --query properties.outputs.cosmosDbAccountName.value `
+    --output tsv
+
+$CosmosConnectionString = az cosmosdb keys list `
+    --name $CosmosAccountName `
+    --resource-group $ResourceGroup `
+    --type connection-strings `
+    --query "connectionStrings[0].connectionString" `
     --output tsv
 
 $AppConfigEndpoint = az deployment group show `
@@ -157,6 +164,7 @@ Write-Host "🎉 Deployment Complete!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:"
 Write-Host "  1. Review .env file for connection strings"
+Write-Host "     Connection strings are fetched directly from Azure, not from Bicep outputs"
 Write-Host "  2. Run 'npm run build' to compile TypeScript"
 Write-Host "  3. Deploy Function App code: npm run deploy:functions"
 Write-Host "  4. Deploy Static Web App: npm run deploy:web"

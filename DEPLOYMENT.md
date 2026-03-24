@@ -96,10 +96,17 @@ COSMOS_ENDPOINT=$(az deployment group show \
   --query properties.outputs.cosmosDbEndpoint.value \
   --output tsv)
 
-COSMOS_CONNECTION_STRING=$(az deployment group show \
+COSMOS_ACCOUNT_NAME=$(az deployment group show \
   --name "$DEPLOYMENT_NAME" \
   --resource-group "$RESOURCE_GROUP" \
-  --query properties.outputs.cosmosDbConnectionString.value \
+  --query properties.outputs.cosmosDbAccountName.value \
+  --output tsv)
+
+COSMOS_CONNECTION_STRING=$(az cosmosdb keys list \
+  --name "$COSMOS_ACCOUNT_NAME" \
+  --resource-group "$RESOURCE_GROUP" \
+  --type connection-strings \
+  --query "connectionStrings[0].connectionString" \
   --output tsv)
 
 APP_CONFIG_ENDPOINT=$(az deployment group show \
@@ -321,6 +328,7 @@ az cosmosdb update \
 ## Next Steps After Deployment
 
 1. **Verify .env file created** - Check that connection strings are correct
+   Connection strings are fetched directly from Azure, not from Bicep outputs.
 2. **Test Cosmos DB connection** - Run a simple query
 3. **Seed NYC city config** - Use script to create initial tenant
 4. **Deploy Function App code** - Build and deploy API endpoints

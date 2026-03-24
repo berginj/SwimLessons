@@ -61,7 +61,7 @@ module functionApps 'modules/function-apps.bicep' = {
     functionAppName: 'func-swim-${resourceSuffix}'
     location: location
     tags: tags
-    cosmosConnectionString: cosmosDb.outputs.connectionString
+    cosmosAccountName: cosmosDb.outputs.accountName
     cosmosDatabaseId: 'swimlessons'
     appConfigEndpoint: appConfiguration.outputs.endpoint
     keyVaultName: keyVault.outputs.vaultName
@@ -91,8 +91,8 @@ module staticWebApp 'modules/static-web-app.bicep' = {
 }
 
 // === Outputs ===
+output cosmosDbAccountName string = cosmosDb.outputs.accountName
 output cosmosDbEndpoint string = cosmosDb.outputs.endpoint
-output cosmosDbConnectionString string = cosmosDb.outputs.connectionString
 output appConfigEndpoint string = appConfiguration.outputs.endpoint
 output keyVaultName string = keyVault.outputs.vaultName
 output functionAppName string = functionApps.outputs.functionAppName

@@ -75,10 +75,17 @@ echo ""
 echo "📊 Deployment Outputs:"
 echo ""
 
-COSMOS_CONNECTION_STRING=$(az deployment group show \
+COSMOS_ACCOUNT_NAME=$(az deployment group show \
     --name "$DEPLOYMENT_NAME" \
     --resource-group "$RESOURCE_GROUP" \
-    --query properties.outputs.cosmosDbConnectionString.value \
+    --query properties.outputs.cosmosDbAccountName.value \
+    --output tsv)
+
+COSMOS_CONNECTION_STRING=$(az cosmosdb keys list \
+    --name "$COSMOS_ACCOUNT_NAME" \
+    --resource-group "$RESOURCE_GROUP" \
+    --type connection-strings \
+    --query "connectionStrings[0].connectionString" \
     --output tsv)
 
 APP_CONFIG_ENDPOINT=$(az deployment group show \
@@ -156,6 +163,7 @@ echo "🎉 Deployment Complete!"
 echo ""
 echo "Next steps:"
 echo "  1. Review .env file for connection strings"
+echo "     Connection strings are fetched directly from Azure, not from Bicep outputs"
 echo "  2. Run 'npm run build' to compile TypeScript"
 echo "  3. Deploy Function App code: npm run deploy:functions"
 echo "  4. Deploy Static Web App: npm run deploy:web"

@@ -26,12 +26,15 @@ const environments = [
 ];
 
 async function main() {
+  await validateCiWorkflow();
+
   for (const env of environments) {
     await validateWorkflow(env);
     await validateParameterFile(env);
   }
 
   await validateStaticWebAppModule();
+  await validateCosmosModule();
   await validateMainBicep();
   await validateDeployScript();
 
@@ -46,8 +49,36 @@ async function main() {
   console.log('Deployment contract validation passed.');
 }
 
+async function validateCiWorkflow() {
+  const workflow = await readRepoText('.github/workflows/ci-build.yml');
+
+  assertContains(
+    workflow,
+    'uses: actions/checkout@v5',
+    '.github/workflows/ci-build.yml must use actions/checkout@v5'
+  );
+
+  assertContains(
+    workflow,
+    'uses: actions/setup-node@v5',
+    '.github/workflows/ci-build.yml must use actions/setup-node@v5'
+  );
+}
+
 async function validateWorkflow(env) {
   const workflow = await readRepoText(env.workflowPath);
+
+  assertContains(
+    workflow,
+    'uses: actions/checkout@v5',
+    `${env.workflowPath} must use actions/checkout@v5`
+  );
+
+  assertContains(
+    workflow,
+    'uses: actions/setup-node@v5',
+    `${env.workflowPath} must use actions/setup-node@v5 where Node is configured`
+  );
 
   assertContains(
     workflow,
@@ -148,6 +179,12 @@ async function validateStaticWebAppModule() {
     'output staticWebAppName string = staticWebApp.name',
     'static-web-app.bicep must output staticWebAppName for the workflow link step'
   );
+
+  assertDoesNotContain(
+    moduleText,
+    'listSecrets(',
+    'static-web-app.bicep must not emit deployment secrets via outputs'
+  );
 }
 
 async function validateMainBicep() {
@@ -157,6 +194,34 @@ async function validateMainBicep() {
     mainBicep,
     "output staticWebAppName string = staticWebApp.outputs.staticWebAppName",
     'main.bicep must output staticWebAppName for workflow backend linking'
+  );
+
+  assertContains(
+    mainBicep,
+    "output cosmosDbAccountName string = cosmosDb.outputs.accountName",
+    'main.bicep must output cosmosDbAccountName for manual secret retrieval'
+  );
+
+  assertDoesNotContain(
+    mainBicep,
+    'cosmosDbConnectionString',
+    'main.bicep must not emit Cosmos DB connection strings via outputs'
+  );
+}
+
+async function validateCosmosModule() {
+  const cosmosModule = await readRepoText('infrastructure-as-code/bicep/modules/cosmos-db.bicep');
+
+  assertDoesNotContain(
+    cosmosModule,
+    'listConnectionStrings(',
+    'cosmos-db.bicep must not emit connection strings via outputs'
+  );
+
+  assertContains(
+    cosmosModule,
+    'output accountName string = cosmosAccount.name',
+    'cosmos-db.bicep must output accountName for manual secret retrieval'
   );
 }
 

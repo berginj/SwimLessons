@@ -3,6 +3,7 @@
  */
 
 @description('Function App name')
+@minLength(1)
 param functionAppName string
 
 @description('Azure region')
@@ -11,9 +12,8 @@ param location string
 @description('Resource tags')
 param tags object
 
-@description('Cosmos DB connection string')
-@secure()
-param cosmosConnectionString string
+@description('Cosmos DB account name')
+param cosmosAccountName string
 
 @description('App Configuration endpoint')
 param appConfigEndpoint string
@@ -98,7 +98,7 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         }
         {
           name: 'COSMOS_CONNECTION_STRING'
-          value: cosmosConnectionString
+          value: listConnectionStrings(resourceId('Microsoft.DocumentDB/databaseAccounts', cosmosAccountName), '2023-04-15').connectionStrings[0].connectionString
         }
         {
           name: 'COSMOS_DATABASE_ID'

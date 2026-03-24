@@ -125,5 +125,4 @@ resource eventsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/con
 }
 
 output endpoint string = cosmosAccount.properties.documentEndpoint
-output connectionString string = cosmosAccount.listConnectionStrings().connectionStrings[0].connectionString
 output accountName string = cosmosAccount.name

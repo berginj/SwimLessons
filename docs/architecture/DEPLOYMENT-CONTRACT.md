@@ -35,6 +35,11 @@ The workflow must set:
 Infra-only deploys are allowed, but they do not replace a full deployment of the Functions package and Static Web App content.
 After infra changes, the safe path is still the full staging workflow.
 
+7. Deployment outputs must not contain secrets.
+Bicep outputs may include identifiers, hostnames, and resource names.
+Bicep outputs must not include connection strings, access keys, or deployment tokens.
+Secrets must be fetched directly from Azure control-plane commands when needed.
+
 ## Environment Contract
 
 ### Staging
@@ -69,6 +74,8 @@ If any of those steps are skipped, the deployment is incomplete.
 - Do not infer the Bicep parameter file from `ENVIRONMENT` when the workflow already has an explicit `PARAMETERS_FILE`.
 - Do not manage SWA linked backends from Bicep in this repo.
 - Do not require authentication on the public search endpoints unless the HTTP contract is deliberately changed.
+- Do not output Cosmos DB connection strings or Static Web App deployment tokens from Bicep.
+- Do not downgrade GitHub Actions below the Node 24-capable majors used in this repo.
 
 ## Manual Deployment Rule
 
