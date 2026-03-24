@@ -1,3 +1,5 @@
+import telemetry from './telemetry.js';
+
 const API_BASE = window.SWIM_API_BASE_URL || '/api';
 
 const DAY_OPTIONS = [
@@ -174,6 +176,10 @@ async function init() {
   renderDayChips();
   elements.form.addEventListener('submit', handleSearch);
   await detectApiMode();
+
+  // TRACK: Page loaded
+  telemetry.trackPageLoaded(state.mode);
+
   await handleSearch();
 }
 
@@ -238,15 +244,38 @@ function renderDayChips() {
 
 async function handleSearch(event) {
   event?.preventDefault();
+  const searchStartTime = performance.now();
+
   elements.summary.textContent = 'Searching...';
   elements.results.innerHTML = '<div class="loading-note">Looking for sessions.</div>';
+
+  // Build filters for tracking
+  const requestBody = buildSearchRequest();
+
+  // TRACK: Search started
+  telemetry.trackSearchStarted(requestBody.filters);
 
   try {
     const results = state.mode === 'live' ? await searchLiveApi() : searchDemoData();
     state.results = results;
+
+    const executionTime = performance.now() - searchStartTime;
+
+    // TRACK: Results returned
+    telemetry.trackSearchResultsReturned(results.length, executionTime, false);
+
+    // TRACK: No results (critical abandonment point!)
+    if (results.length === 0) {
+      telemetry.trackNoResults(requestBody.filters, false, false);
+    }
+
     renderResults(results);
   } catch (error) {
     console.warn('Search failed, switching to demo mode:', error);
+
+    // TRACK: Error occurred
+    telemetry.trackError('SearchAPIError', error.message, 'search');
+
     setMode('demo', 'Demo fallback');
     state.results = searchDemoData();
     renderResults(state.results);
@@ -422,7 +451,12 @@ function renderResults(results) {
       </div>
     `;
 
-    card.querySelector('button').addEventListener('click', () => openSessionDetails(result));
+    const cardIndex = results.indexOf(result);
+    card.querySelector('button').addEventListener('click', () => {
+      // TRACK: Session viewed (user clicked to see details)
+      telemetry.trackSessionViewed(result.session, cardIndex + 1, result.distance);
+      openSessionDetails(result);
+    });
     elements.results.appendChild(card);
   }
 }
@@ -496,6 +530,11 @@ function createDemoSessionDetails(sessionId) {
 }
 
 function renderDialog(details) {
+  const modalOpenTime = Date.now();
+
+  // TRACK: Modal opened
+  telemetry.trackModalOpened(details.session?.id);
+
   const addressText = formatAddress(details.location?.address);
   const related = Array.isArray(details.relatedSessions) && details.relatedSessions.length > 0
     ? `<ul>${details.relatedSessions
@@ -533,10 +572,30 @@ function renderDialog(details) {
         ${related}
       </div>
       <div class="detail-actions">
-        <a class="primary-button" href="${escapeAttribute(registrationUrl)}" target="_blank" rel="noreferrer">Go to provider signup</a>
+        <a class="primary-button signup-link" href="${escapeAttribute(registrationUrl)}" target="_blank" rel="noreferrer">Go to provider signup</a>
       </div>
     </div>
   `;
+
+  // Add click tracking to signup link
+  setTimeout(() => {
+    const signupLink = elements.dialogContent.querySelector('.signup-link');
+    if (signupLink) {
+      signupLink.addEventListener('click', () => {
+        // TRACK: Signup clicked (CONVERSION!)
+        const position = state.results.findIndex(r => r.session?.id === details.session?.id) + 1;
+        telemetry.trackSignupClicked(details.session, position);
+      });
+    }
+  }, 0);
+
+  // Track modal close
+  const closeHandler = () => {
+    const viewDuration = Date.now() - modalOpenTime;
+    telemetry.trackModalClosed(details.session?.id, viewDuration);
+    elements.dialog.removeEventListener('close', closeHandler);
+  };
+  elements.dialog.addEventListener('close', closeHandler, { once: true });
 
   if (typeof elements.dialog.showModal === 'function') {
     elements.dialog.showModal();
