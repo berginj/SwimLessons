@@ -63,6 +63,18 @@ async function validateCiWorkflow() {
     'uses: actions/setup-node@v5',
     '.github/workflows/ci-build.yml must use actions/setup-node@v5'
   );
+
+  assertContains(
+    workflow,
+    'uses: codecov/codecov-action@v5',
+    '.github/workflows/ci-build.yml must use codecov/codecov-action@v5'
+  );
+
+  assertContains(
+    workflow,
+    'use_oidc: true',
+    '.github/workflows/ci-build.yml must use OIDC for Codecov uploads'
+  );
 }
 
 async function validateWorkflow(env) {
