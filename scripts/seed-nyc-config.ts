@@ -10,7 +10,7 @@ import { CityConfig, TenantCatalog } from '../src/core/contracts/city-config';
 
 // Load environment
 import * as dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({ path: '../.env' });
 
 const connectionString = process.env.COSMOS_CONNECTION_STRING;
 const databaseId = process.env.COSMOS_DATABASE_ID || 'swimlessons';

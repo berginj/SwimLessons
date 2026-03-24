@@ -33,7 +33,6 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2023-04-15' = {
         isZoneRedundant: false
       }
     ]
-    enableFreeTier: true
     capabilities: enableServerless ? [
       {
         name: 'EnableServerless'

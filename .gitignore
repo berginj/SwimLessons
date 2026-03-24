@@ -17,6 +17,20 @@ build/
 .env.local
 .env.*.local
 
+# Claude settings (may contain secrets)
+.claude/settings.local.json
+
+# Deployment artifacts
+function-app.zip
+deploy-package/
+function-deploy/
+deployment-output.json
+deployment.log
+
+# Secret files (DO NOT COMMIT!)
+GITHUB-SECRETS.txt
+*-SECRETS.txt
+
 # Azure
 local.settings.json
 *.azureauth
