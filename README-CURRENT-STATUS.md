@@ -22,83 +22,39 @@ https://portal.azure.com → Resource Groups → pools-dev-rg
 
 **Total:** 11,000+ lines of production TypeScript
 **Build:** ✅ Compiles successfully (0 errors)
-**Deployment Package:** ✅ function-app.zip ready (40MB)
+**Deployment Package:** ✅ `npm run build:functions:deploy` produces a deployable Function App package
+**Static Web App:** ✅ `src/web/` is ready to deploy without a separate frontend build
 
 ---
 
-## ⚠️ **GITHUB PUSH BLOCKED**
+## ⚠️ **GITHUB AUTH / SECRET STATUS**
 
-**Issue:** GitHub's secret scanning detected a Cosmos DB key in an old commit
+This repo is moving to GitHub OIDC for Azure login.
 
-**The commit:** `d0e217e` (from earlier today)
-**File:** `.claude/settings.local.json` (now deleted)
+That means:
 
-**Why it blocks:** Even though we deleted the file, the secret is in git history
+- ✅ No more `AZURE_CREDENTIALS` JSON secret is required
+- ✅ GitHub Actions can use short-lived tokens via `azure/login@v3`
+- ❌ Old guidance to whitelist leaked Azure secrets is obsolete
 
----
+If secret scanning blocks a push because of older leaked credentials, the correct response is:
 
-## 🎯 **YOUR OPTIONS:**
+1. Rotate the leaked Azure credential
+2. Remove secret-bearing files or commits
+3. Push the cleaned history if needed
 
-### **Option 1: Allow the Secret on GitHub (Recommended)**
+Do not treat "Allow secret" as the default fix for Azure credentials.
 
-1. Click this link: https://github.com/berginj/SwimLessons/security/secret-scanning/unblock-secret/3BN6PHqj9LhfiuGqmoH4nGXz5By
-2. Click "Allow secret"
-3. Run `git push origin main`
-4. ✅ Push succeeds
+Required GitHub secrets now:
 
-**Safe because:**
-- The secret is already in your .env (local only)
-- It's for your dev environment
-- You control the Azure subscription
+- `AZURE_CLIENT_ID`
+- `AZURE_TENANT_ID`
+- `AZURE_SUBSCRIPTION_ID`
+- `AZURE_SWA_POOLS`
 
----
+Production uses the corresponding `_PROD` variants.
 
-### **Option 2: Continue Working Locally**
-
-**Everything works without pushing to GitHub:**
-- ✅ Azure is deployed
-- ✅ Database has data
-- ✅ Code is built
-- ✅ Demo works
-
-**Just can't:**
-- ❌ Share code with team via GitHub
-- ❌ Use GitHub Actions CI/CD
-
-**For solo development, this is fine!**
-
----
-
-### **Option 3: Rewrite Git History (Advanced)**
-
-**Remove the secret from git history:**
-```bash
-# This rewrites history (risky!)
-git filter-branch --force --index-filter \
-  "git rm --cached --ignore-unmatch .claude/settings.local.json" \
-  --prune-empty --tag-name-filter cat -- --all
-
-# Force push
-git push origin main --force
-```
-
-**Warning:** Only do this if you're the only developer!
-
----
-
-## 💡 **MY RECOMMENDATION:**
-
-**Click the GitHub link and allow the secret.**
-
-Why:
-- ✅ Simplest (1 click)
-- ✅ Safe (it's your dev environment)
-- ✅ Lets you push code
-- ✅ Lets team collaborate
-
-Link: https://github.com/berginj/SwimLessons/security/secret-scanning/unblock-secret/3BN6PHqj9LhfiuGqmoH4nGXz5By
-
-Then run: `git push origin main`
+As of 2026-03-24, the staging GitHub Actions deploy is blocked at Azure login until the OIDC IDs above are added in GitHub.
 
 ---
 
