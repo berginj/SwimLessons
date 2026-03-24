@@ -71,11 +71,28 @@ export class NYCDOEAdapter extends BaseAdapter {
     }
 
     const content = fs.readFileSync(this.csvPath, 'utf-8');
-    const lines = content.trim().split('\n');
-    const headers = lines[0].split(',').map(h => h.trim());
+    const trimmedContent = content.trim();
+    if (!trimmedContent) {
+      console.warn(`CSV file is empty: ${this.csvPath}`);
+      return [];
+    }
+
+    const lines = trimmedContent.split('\n');
+    const headerLine = lines[0];
+    if (!headerLine) {
+      console.warn(`CSV header row missing: ${this.csvPath}`);
+      return [];
+    }
+
+    const headers = headerLine.split(',').map((h) => h.trim());
 
     for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',');
+      const line = lines[i];
+      if (!line) {
+        continue;
+      }
+
+      const values = line.split(',');
       const row: any = {};
 
       headers.forEach((header, index) => {
