@@ -1,0 +1,7 @@
+WARNING: A new Bicep release is available: v0.41.2. Upgrade now by running "az bicep upgrade".
+WARNING: C:\Users\berginjohn\App\pools\infrastructure-as-code\bicep\modules\cosmos-db.bicep(134,34) : Warning outputs-should-not-contain-secrets: Outputs should not contain secrets. Found possible secret: function 'listConnectionStrings' [https://aka.ms/bicep/linter-diagnostics#outputs-should-not-contain-secrets]
+C:\Users\berginjohn\App\pools\infrastructure-as-code\bicep\modules\static-web-app.bicep(19,7) : Warning no-unused-params: Parameter "functionsApiBackend" is declared but never used. [https://aka.ms/bicep/linter-diagnostics#no-unused-params]
+C:\Users\berginjohn\App\pools\infrastructure-as-code\bicep\modules\static-web-app.bicep(45,33) : Warning outputs-should-not-contain-secrets: Outputs should not contain secrets. Found possible secret: function 'listSecrets' [https://aka.ms/bicep/linter-diagnostics#outputs-should-not-contain-secrets]
+C:\Users\berginjohn\App\pools\infrastructure-as-code\bicep\modules\function-apps.bicep(26,9) : Warning BCP334: The provided value can have a length as small as 2 and may be too short to assign to a target with a configured minimum length of 3. [https://aka.ms/bicep/core-diagnostics#BCP334]
+
+ERROR: {"code": "ResourceGroupNotFound", "message": "Resource group 'swim-lessons-dev-rg' could not be found."}

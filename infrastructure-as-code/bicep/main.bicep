@@ -12,7 +12,7 @@ param environment string = 'dev'
 param location string = resourceGroup().location
 
 @description('Unique suffix for resource names')
-param resourceSuffix string = uniqueString(resourceGroup().id)
+param resourceSuffix string = substring(uniqueString(resourceGroup().id), 0, 6)
 
 @description('Tags to apply to all resources')
 param tags object = {
@@ -25,7 +25,7 @@ param tags object = {
 module cosmosDb 'modules/cosmos-db.bicep' = {
   name: 'cosmosDb-deployment'
   params: {
-    accountName: 'cosmos-swimlessons-${resourceSuffix}'
+    accountName: 'cosmos-swim-${resourceSuffix}'
     location: location
     tags: tags
     enableServerless: true
@@ -36,7 +36,7 @@ module cosmosDb 'modules/cosmos-db.bicep' = {
 module appConfiguration 'modules/app-configuration.bicep' = {
   name: 'appConfig-deployment'
   params: {
-    configStoreName: 'appconfig-swimlessons-${resourceSuffix}'
+    configStoreName: 'appconfig-swim-${resourceSuffix}'
     location: location
     tags: tags
     sku: 'free'
@@ -47,7 +47,7 @@ module appConfiguration 'modules/app-configuration.bicep' = {
 module keyVault 'modules/key-vault.bicep' = {
   name: 'keyVault-deployment'
   params: {
-    vaultName: 'kv-swimlessons-${resourceSuffix}'
+    vaultName: 'kv-swim-${resourceSuffix}'
     location: location
     tags: tags
     sku: 'standard'
@@ -58,7 +58,7 @@ module keyVault 'modules/key-vault.bicep' = {
 module functionApps 'modules/function-apps.bicep' = {
   name: 'functionApps-deployment'
   params: {
-    functionAppName: 'func-swimlessons-${resourceSuffix}'
+    functionAppName: 'func-swim-${resourceSuffix}'
     location: location
     tags: tags
     cosmosConnectionString: cosmosDb.outputs.connectionString
@@ -71,7 +71,7 @@ module functionApps 'modules/function-apps.bicep' = {
 module appInsights 'modules/application-insights.bicep' = {
   name: 'appInsights-deployment'
   params: {
-    appInsightsName: 'appi-swimlessons-${resourceSuffix}'
+    appInsightsName: 'appi-swim-${resourceSuffix}'
     location: location
     tags: tags
     samplingPercentage: 20  // Cost optimization: sample 20% of requests
@@ -82,7 +82,7 @@ module appInsights 'modules/application-insights.bicep' = {
 module staticWebApp 'modules/static-web-app.bicep' = {
   name: 'staticWebApp-deployment'
   params: {
-    staticWebAppName: 'swa-swimlessons-${resourceSuffix}'
+    staticWebAppName: 'swa-swim-${resourceSuffix}'
     location: location
     tags: tags
     sku: 'Free'

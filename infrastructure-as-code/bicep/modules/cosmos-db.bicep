@@ -33,6 +33,7 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2023-04-15' = {
         isZoneRedundant: false
       }
     ]
+    enableFreeTier: true
     capabilities: enableServerless ? [
       {
         name: 'EnableServerless'
@@ -88,16 +89,10 @@ resource sessionsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/c
         indexingMode: 'consistent'
         automatic: true
         includedPaths: [
-          { path: '/cityId/?' }
-          { path: '/startDate/?' }
-          { path: '/daysOfWeek/*' }
-          { path: '/geographyIds/*' }
-          { path: '/timeOfDay/start/?' }
-          { path: '/type/?' }
+          { path: '/*' }
         ]
         excludedPaths: [
-          { path: '/searchTerms/?' }
-          { path: '/description/?' }
+          { path: '/"_etag"/?' }
         ]
       }
     }
@@ -120,9 +115,10 @@ resource eventsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/con
         indexingMode: 'consistent'
         automatic: true
         includedPaths: [
-          { path: '/cityId/?' }
-          { path: '/eventName/?' }
-          { path: '/timestamp/?' }
+          { path: '/*' }
+        ]
+        excludedPaths: [
+          { path: '/"_etag"/?' }
         ]
       }
     }
