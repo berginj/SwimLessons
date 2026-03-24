@@ -62,6 +62,7 @@ module functionApps 'modules/function-apps.bicep' = {
     location: location
     tags: tags
     cosmosConnectionString: cosmosDb.outputs.connectionString
+    cosmosDatabaseId: 'swimlessons'
     appConfigEndpoint: appConfiguration.outputs.endpoint
     keyVaultName: keyVault.outputs.vaultName
   }
@@ -86,7 +87,7 @@ module staticWebApp 'modules/static-web-app.bicep' = {
     location: location
     tags: tags
     sku: 'Free'
-    functionsApiBackend: functionApps.outputs.functionAppUrl
+    functionsApiBackendResourceId: functionApps.outputs.functionAppResourceId
   }
 }
 
@@ -95,6 +96,7 @@ output cosmosDbEndpoint string = cosmosDb.outputs.endpoint
 output cosmosDbConnectionString string = cosmosDb.outputs.connectionString
 output appConfigEndpoint string = appConfiguration.outputs.endpoint
 output keyVaultName string = keyVault.outputs.vaultName
+output functionAppName string = functionApps.outputs.functionAppName
 output functionAppUrl string = functionApps.outputs.functionAppUrl
 output appInsightsInstrumentationKey string = appInsights.outputs.instrumentationKey
 output staticWebAppUrl string = staticWebApp.outputs.url

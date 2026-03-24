@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Swim Lessons NYC</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <p class="eyebrow">NYC MVP</p>
+        <h1>Find kids' swim lessons without digging through five provider sites.</h1>
+        <p class="hero-copy">
+          This MVP uses the deployed Azure Functions API when available and falls back to local
+          demo data when it is not.
+        </p>
+      </header>
+
+      <main class="layout">
+        <section class="panel search-panel">
+          <div class="panel-header">
+            <h2>Search</h2>
+            <span id="api-status" class="status-pill status-pending">Checking API</span>
+          </div>
+
+          <form id="search-form" class="filters">
+            <label class="field">
+              <span>City</span>
+              <select id="city-id" name="cityId"></select>
+            </label>
+
+            <label class="field">
+              <span>Child age</span>
+              <select id="child-age" name="childAge">
+                <option value="">Any age</option>
+                <option value="24">2 years old</option>
+                <option value="36">3 years old</option>
+                <option value="48">4 years old</option>
+                <option value="60">5 years old</option>
+                <option value="72">6 years old</option>
+                <option value="84">7 years old</option>
+                <option value="96">8 years old</option>
+                <option value="108">9 years old</option>
+                <option value="120">10 years old</option>
+              </select>
+            </label>
+
+            <div class="field">
+              <span>Days</span>
+              <div id="day-chips" class="chip-row"></div>
+            </div>
+
+            <label class="field">
+              <span>Borough</span>
+              <select id="geography" name="geography">
+                <option value="">All boroughs</option>
+                <option value="manhattan">Manhattan</option>
+                <option value="brooklyn">Brooklyn</option>
+                <option value="queens">Queens</option>
+                <option value="bronx">The Bronx</option>
+                <option value="staten-island">Staten Island</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Time window</span>
+              <select id="time-window" name="timeWindow">
+                <option value="">Any time</option>
+                <option value="morning">Morning</option>
+                <option value="afternoon">Afternoon</option>
+                <option value="evening">Evening</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Max price</span>
+              <input id="price-max" name="priceMax" type="number" min="0" step="25" placeholder="Any" />
+            </label>
+
+            <button id="search-button" class="primary-button" type="submit">Search sessions</button>
+          </form>
+        </section>
+
+        <section class="panel results-panel">
+          <div class="panel-header">
+            <h2>Results</h2>
+            <p id="results-summary" class="subtle-copy">Waiting for a search.</p>
+          </div>
+          <div id="results" class="results-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="session-dialog" class="session-dialog">
+      <div id="dialog-content"></div>
+      <form method="dialog" class="dialog-actions">
+        <button class="secondary-button" type="submit">Close</button>
+      </form>
+    </dialog>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

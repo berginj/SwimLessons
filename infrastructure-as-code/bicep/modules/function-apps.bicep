@@ -21,6 +21,9 @@ param appConfigEndpoint string
 @description('Key Vault name')
 param keyVaultName string
 
+@description('Cosmos DB database ID')
+param cosmosDatabaseId string = 'swimlessons'
+
 // Storage account for Function App (required)
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   name: 'st${replace(functionAppName, '-', '')}' // Remove hyphens, max 24 chars
@@ -98,6 +101,10 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
           value: cosmosConnectionString
         }
         {
+          name: 'COSMOS_DATABASE_ID'
+          value: cosmosDatabaseId
+        }
+        {
           name: 'APP_CONFIG_ENDPOINT'
           value: appConfigEndpoint
         }
@@ -116,4 +123,5 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
 
 output functionAppUrl string = 'https://${functionApp.properties.defaultHostName}'
 output functionAppName string = functionApp.name
+output functionAppResourceId string = functionApp.id
 output principalId string = functionApp.identity.principalId

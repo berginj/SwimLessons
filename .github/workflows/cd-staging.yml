@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+  id-token: write
+
 env:
   ENVIRONMENT: staging
   RESOURCE_GROUP: swim-lessons-staging-rg
@@ -22,9 +26,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Azure Login
-        uses: azure/login@v1
+        uses: azure/login@v3
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Create Resource Group
         run: |
@@ -71,22 +77,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Function App
+      - name: Build Function deployment package
         run: |
-          npm run build
-          cd src/functions
-          npm ci --production
+          npm run build:functions:deploy
+          npm install --prefix function-deploy --omit=dev
 
       - name: Azure Login
-        uses: azure/login@v1
+        uses: azure/login@v3
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
         with:
           app-name: ${{ needs.deploy-infrastructure.outputs.functionAppName }}
-          package: './src/functions'
+          package: './function-deploy'
 
       - name: Verify deployment
         run: |
@@ -102,21 +109,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build React App
-        run: |
-          cd src/web
-          npm ci
-          npm run build
-
       - name: Deploy to Azure Static Web Apps
         uses: Azure/static-web-apps-deploy@v1
         with:
@@ -124,7 +116,9 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: 'upload'
           app_location: 'src/web'
-          output_location: 'dist'
+          api_location: ''
+          output_location: ''
+          skip_app_build: true
 
       - name: Verify deployment
         run: |
@@ -147,5 +141,8 @@ jobs:
 
       - name: Run smoke tests
         run: |
-          # TODO: Add smoke tests
+          curl --fail --silent --show-error --retry 8 --retry-delay 10 --retry-all-errors \
+            "${{ needs.deploy-infrastructure.outputs.staticWebAppUrl }}/"
+          curl --fail --silent --show-error --retry 8 --retry-delay 10 --retry-all-errors \
+            "${{ needs.deploy-infrastructure.outputs.staticWebAppUrl }}/api/cities"
           echo "✅ Smoke tests passed"

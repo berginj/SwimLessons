@@ -15,8 +15,8 @@ param tags object
 @allowed(['Free', 'Standard'])
 param sku string = 'Free'
 
-@description('Backend Function App URL (for API proxy)')
-param functionsApiBackend string
+@description('Backend Function App resource ID (for linked API routing)')
+param functionsApiBackendResourceId string = ''
 
 resource staticWebApp 'Microsoft.Web/staticSites@2023-01-01' = {
   name: staticWebAppName
@@ -29,13 +29,22 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-01-01' = {
   properties: {
     buildProperties: {
       appLocation: 'src/web'
-      apiLocation: ''  // Functions API is separate
-      outputLocation: 'dist'
+      apiLocation: ''
+      outputLocation: ''
     }
     stagingEnvironmentPolicy: 'Enabled'
     allowConfigFileUpdates: true
     provider: 'GitHub'
     enterpriseGradeCdnStatus: 'Disabled'
+  }
+}
+
+resource linkedBackend 'Microsoft.Web/staticSites/linkedBackends@2023-01-01' = if (!empty(functionsApiBackendResourceId)) {
+  parent: staticWebApp
+  name: 'functions'
+  properties: {
+    backendResourceId: functionsApiBackendResourceId
+    region: location
   }
 }
 

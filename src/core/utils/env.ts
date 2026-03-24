@@ -69,7 +69,7 @@ export function loadEnvironmentConfig(): EnvironmentConfig {
   return {
     environment: env,
     cosmosConnectionString: getEnvRequired('COSMOS_CONNECTION_STRING'),
-    cosmosDatabaseId: getEnvOptional('COSMOS_DATABASE_ID', 'swim-lessons-db'),
+    cosmosDatabaseId: getEnvOptional('COSMOS_DATABASE_ID', 'swimlessons'),
     appConfigEndpoint: getEnvRequired('APP_CONFIG_ENDPOINT'),
     keyVaultName: getEnvRequired('KEY_VAULT_NAME'),
     applicationInsightsConnectionString: getEnvOptional('APPLICATIONINSIGHTS_CONNECTION_STRING', ''),
