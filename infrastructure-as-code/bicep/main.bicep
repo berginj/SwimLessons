@@ -87,7 +87,6 @@ module staticWebApp 'modules/static-web-app.bicep' = {
     location: location
     tags: tags
     sku: 'Standard'
-    functionsApiBackendResourceId: functionApps.outputs.functionAppResourceId
   }
 }
 
@@ -99,5 +98,6 @@ output keyVaultName string = keyVault.outputs.vaultName
 output functionAppName string = functionApps.outputs.functionAppName
 output functionAppUrl string = functionApps.outputs.functionAppUrl
 output appInsightsInstrumentationKey string = appInsights.outputs.instrumentationKey
+output staticWebAppName string = staticWebApp.outputs.staticWebAppName
 output staticWebAppUrl string = staticWebApp.outputs.url
 output staticWebAppDefaultHostname string = staticWebApp.outputs.defaultHostname

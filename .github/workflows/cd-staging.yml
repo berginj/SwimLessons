@@ -11,7 +11,8 @@ permissions:
 env:
   ENVIRONMENT: staging
   RESOURCE_GROUP: swim-lessons-staging-rg
-  LOCATION: eastus
+  RESOURCE_GROUP_LOCATION: eastus
+  PARAMETERS_FILE: infrastructure-as-code/bicep/parameters/staging.parameters.json
 
 jobs:
   deploy-infrastructure:
@@ -19,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       functionAppName: ${{ steps.deploy.outputs.functionAppName }}
+      staticWebAppName: ${{ steps.deploy.outputs.staticWebAppName }}
       staticWebAppUrl: ${{ steps.deploy.outputs.staticWebAppUrl }}
 
     steps:
@@ -32,11 +34,21 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Create Resource Group
+      - name: Ensure Resource Group Exists
         run: |
-          az group create \
+          CURRENT_RG_LOCATION=$(az group show \
             --name ${{ env.RESOURCE_GROUP }} \
-            --location ${{ env.LOCATION }}
+            --query location \
+            --output tsv 2>/dev/null || true)
+
+          if [ -z "$CURRENT_RG_LOCATION" ]; then
+            az group create \
+              --name ${{ env.RESOURCE_GROUP }} \
+              --location ${{ env.RESOURCE_GROUP_LOCATION }}
+            echo "Created resource group in ${{ env.RESOURCE_GROUP_LOCATION }}"
+          else
+            echo "Using existing resource group in $CURRENT_RG_LOCATION"
+          fi
 
       - name: Deploy Bicep Template
         id: deploy
@@ -47,17 +59,58 @@ jobs:
             --name "$DEPLOYMENT_NAME" \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --template-file infrastructure-as-code/bicep/main.bicep \
-            --parameters infrastructure-as-code/bicep/parameters/${{ env.ENVIRONMENT }}.parameters.json \
+            --parameters ${{ env.PARAMETERS_FILE }} \
             --output json > deployment-output.json
 
           # Extract outputs
           FUNCTION_APP_NAME=$(jq -r '.properties.outputs.functionAppName.value' deployment-output.json)
+          STATIC_WEB_APP_NAME=$(jq -r '.properties.outputs.staticWebAppName.value' deployment-output.json)
           STATIC_WEB_APP_URL=$(jq -r '.properties.outputs.staticWebAppUrl.value' deployment-output.json)
 
           echo "functionAppName=$FUNCTION_APP_NAME" >> $GITHUB_OUTPUT
+          echo "staticWebAppName=$STATIC_WEB_APP_NAME" >> $GITHUB_OUTPUT
           echo "staticWebAppUrl=$STATIC_WEB_APP_URL" >> $GITHUB_OUTPUT
 
           echo "✅ Infrastructure deployed successfully"
+
+      - name: Link Function App Backend
+        run: |
+          FUNCTION_APP_NAME="${{ steps.deploy.outputs.functionAppName }}"
+          STATIC_WEB_APP_NAME="${{ steps.deploy.outputs.staticWebAppName }}"
+          FUNCTION_APP_ID="/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.RESOURCE_GROUP }}/providers/Microsoft.Web/sites/${FUNCTION_APP_NAME}"
+          FUNCTION_APP_LOCATION=$(az functionapp show \
+            --name "$FUNCTION_APP_NAME" \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query location \
+            --output tsv)
+          EXISTING_BACKEND_ID=$(az staticwebapp backends show \
+            --name "$STATIC_WEB_APP_NAME" \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query "[0].backendResourceId" \
+            --output tsv 2>/dev/null || true)
+
+          if [ -n "$EXISTING_BACKEND_ID" ] && [ "$EXISTING_BACKEND_ID" != "$FUNCTION_APP_ID" ]; then
+            az staticwebapp backends unlink \
+              --name "$STATIC_WEB_APP_NAME" \
+              --resource-group ${{ env.RESOURCE_GROUP }}
+          fi
+
+          if [ "$EXISTING_BACKEND_ID" != "$FUNCTION_APP_ID" ]; then
+            az staticwebapp backends link \
+              --name "$STATIC_WEB_APP_NAME" \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --backend-resource-id "$FUNCTION_APP_ID" \
+              --backend-region "$FUNCTION_APP_LOCATION"
+          fi
+
+      - name: Normalize Function App Auth
+        run: |
+          FUNCTION_APP_NAME="${{ steps.deploy.outputs.functionAppName }}"
+          az resource update \
+            --ids "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.RESOURCE_GROUP }}/providers/Microsoft.Web/sites/${FUNCTION_APP_NAME}/config/authsettingsV2" \
+            --set properties.globalValidation.requireAuthentication=false \
+                  properties.globalValidation.unauthenticatedClientAction=AllowAnonymous \
+            --output none
 
   deploy-functions:
     name: Deploy Function App

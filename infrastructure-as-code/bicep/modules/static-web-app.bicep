@@ -15,9 +15,6 @@ param tags object
 @allowed(['Free', 'Standard'])
 param sku string = 'Free'
 
-@description('Backend Function App resource ID (for linked API routing)')
-param functionsApiBackendResourceId string = ''
-
 resource staticWebApp 'Microsoft.Web/staticSites@2023-01-01' = {
   name: staticWebAppName
   location: location
@@ -39,16 +36,8 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-01-01' = {
   }
 }
 
-resource linkedBackend 'Microsoft.Web/staticSites/linkedBackends@2023-01-01' = if (!empty(functionsApiBackendResourceId)) {
-  parent: staticWebApp
-  name: 'functions'
-  properties: {
-    backendResourceId: functionsApiBackendResourceId
-    region: location
-  }
-}
-
 output url string = 'https://${staticWebApp.properties.defaultHostname}'
 output defaultHostname string = staticWebApp.properties.defaultHostname
+output staticWebAppName string = staticWebApp.name
 output staticWebAppId string = staticWebApp.id
 output deploymentToken string = staticWebApp.listSecrets().properties.apiKey
