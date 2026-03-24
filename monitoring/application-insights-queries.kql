@@ -1,0 +1,554 @@
+// ============================================================================
+// COST MONITORING QUERIES
+// Use these in Application Insights → Logs to track Azure costs
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// 1. Daily Cosmos DB RU Consumption
+// Tracks Request Units consumed per day to estimate Cosmos DB costs
+// ----------------------------------------------------------------------------
+customMetrics
+| where name == "cosmos_db_request_charge"
+| summarize TotalRUs = sum(value) by bin(timestamp, 1d)
+| extend EstimatedDailyCost = TotalRUs * 0.25 / 1000000
+| extend EstimatedMonthlyCost = EstimatedDailyCost * 30
+| project timestamp, TotalRUs, EstimatedDailyCost, EstimatedMonthlyCost
+| order by timestamp desc
+| render timechart
+
+// ----------------------------------------------------------------------------
+// 2. Cost Per Search (RU Consumption)
+// Shows how expensive each search operation is
+// ----------------------------------------------------------------------------
+requests
+| where name == "search"
+| join kind=inner (
+    customMetrics
+    | where name == "cosmos_db_request_charge"
+) on operation_Id
+| summarize AvgRUsPerSearch = avg(value),
+            P50RUs = percentile(value, 50),
+            P95RUs = percentile(value, 95),
+            TotalSearches = count()
+            by bin(timestamp, 1h)
+| extend EstimatedCostPerSearch = AvgRUsPerSearch * 0.25 / 1000000
+| project timestamp, TotalSearches, AvgRUsPerSearch, P95RUs, EstimatedCostPerSearch
+| render timechart
+
+// ----------------------------------------------------------------------------
+// 3. Expensive Queries Identification
+// Find the most expensive Cosmos DB queries to optimize
+// ----------------------------------------------------------------------------
+customMetrics
+| where name == "cosmos_db_request_charge"
+| join kind=inner (
+    requests
+) on operation_Id
+| summarize Count = count(),
+            AvgRUs = avg(value),
+            MaxRUs = max(value),
+            P95RUs = percentile(value, 95)
+            by name, url
+| where AvgRUs > 100 // Flag queries using >100 RUs
+| order by AvgRUs desc
+| project Operation = name, URL = url, Count, AvgRUs, MaxRUs, P95RUs
+
+// ----------------------------------------------------------------------------
+// 4. Monthly Cost Projection
+// Project total monthly cost based on current week's usage
+// ----------------------------------------------------------------------------
+let startOfWeek = startofweek(now());
+customMetrics
+| where name == "cosmos_db_request_charge"
+| where timestamp >= startOfWeek
+| summarize WeeklyRUs = sum(value)
+| extend ProjectedMonthlyRUs = WeeklyRUs * 4.3 // 4.3 weeks per month
+| extend EstimatedCosmosCost = ProjectedMonthlyRUs * 0.25 / 1000000
+| extend TotalEstimatedCost = EstimatedCosmosCost + 10 // Add fixed costs (SWA, storage)
+| project WeeklyRUs, ProjectedMonthlyRUs, EstimatedCosmosCost, TotalEstimatedCost
+
+// ----------------------------------------------------------------------------
+// 5. Cost by API Endpoint
+// See which endpoints are driving costs
+// ----------------------------------------------------------------------------
+requests
+| where timestamp > ago(7d)
+| join kind=inner (
+    customMetrics
+    | where name == "cosmos_db_request_charge"
+) on operation_Id
+| summarize TotalCalls = count(),
+            TotalRUs = sum(value),
+            AvgRUsPerCall = avg(value)
+            by name
+| extend EstimatedMonthlyCost = (TotalRUs / 7 * 30) * 0.25 / 1000000
+| order by TotalRUs desc
+| project Endpoint = name, TotalCalls, TotalRUs, AvgRUsPerCall, EstimatedMonthlyCost
+
+// ----------------------------------------------------------------------------
+// 6. Peak vs Off-Peak Cost Analysis
+// Compare costs during registration windows vs quiet periods
+// ----------------------------------------------------------------------------
+let peakHours = dynamic([9, 10, 11, 12, 13, 14, 15, 16, 17]); // 9am-5pm
+customMetrics
+| where name == "cosmos_db_request_charge"
+| extend Hour = hourofday(timestamp)
+| extend IsPeak = iff(Hour in (peakHours), "Peak (9am-5pm)", "Off-Peak")
+| summarize TotalRUs = sum(value), Operations = count() by IsPeak, bin(timestamp, 1d)
+| extend DailyCost = TotalRUs * 0.25 / 1000000
+| project timestamp, IsPeak, Operations, TotalRUs, DailyCost
+| render timechart
+
+// ============================================================================
+// USER FUNNEL & ABANDONMENT TRACKING
+// Track where users drop off in the search-to-signup flow
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// 7. Complete User Funnel (Search → View → Signup)
+// Shows conversion at each step and identifies drop-off points
+// ----------------------------------------------------------------------------
+let timeRange = 7d;
+let searches = customEvents
+    | where name == "SearchStarted"
+    | where timestamp > ago(timeRange)
+    | summarize SearchCount = count(), Users = dcount(user_Id);
+let resultsReturned = customEvents
+    | where name == "SearchResultsReturned"
+    | where timestamp > ago(timeRange)
+    | summarize ResultsCount = count(), Users = dcount(user_Id);
+let sessionViews = customEvents
+    | where name == "SessionViewed"
+    | where timestamp > ago(timeRange)
+    | summarize ViewCount = count(), Users = dcount(user_Id);
+let signupClicks = customEvents
+    | where name == "SignupClicked"
+    | where timestamp > ago(timeRange)
+    | summarize SignupCount = count(), Users = dcount(user_Id);
+searches
+| extend ResultsReturned = toscalar(resultsReturned | project ResultsCount)
+| extend SessionViews = toscalar(sessionViews | project ViewCount)
+| extend SignupClicks = toscalar(signupClicks | project SignupCount)
+| extend SearchToResults = round(todouble(ResultsReturned) / SearchCount * 100, 1)
+| extend ResultsToView = round(todouble(SessionViews) / ResultsReturned * 100, 1)
+| extend ViewToSignup = round(todouble(SignupClicks) / SessionViews * 100, 1)
+| extend OverallConversion = round(todouble(SignupClicks) / SearchCount * 100, 1)
+| project
+    Step1_Searches = SearchCount,
+    Step2_Results = ResultsReturned,
+    Step3_Views = SessionViews,
+    Step4_Signups = SignupClicks,
+    Conv_SearchToResults = strcat(SearchToResults, "%"),
+    Conv_ResultsToView = strcat(ResultsToView, "%"),
+    Conv_ViewToSignup = strcat(ViewToSignup, "%"),
+    Overall_Conversion = strcat(OverallConversion, "%")
+
+// ----------------------------------------------------------------------------
+// 8. Abandonment Points Analysis
+// Identify WHERE users are dropping off
+// ----------------------------------------------------------------------------
+customEvents
+| where timestamp > ago(7d)
+| where name in ("SearchStarted", "SearchResultsReturned", "SessionViewed", "SignupClicked", "PageAbandoned")
+| summarize Count = count() by name, bin(timestamp, 1d)
+| render columnchart
+
+// ----------------------------------------------------------------------------
+// 9. No Results Rate (Critical Abandonment Point)
+// Track how often users get no results (key abandonment trigger)
+// ----------------------------------------------------------------------------
+let totalSearches = customEvents
+    | where name == "SearchStarted"
+    | where timestamp > ago(7d)
+    | summarize count();
+let noResults = customEvents
+    | where name == "NoResults"
+    | where timestamp > ago(7d)
+    | summarize count();
+print TotalSearches = toscalar(totalSearches),
+      NoResultsSearches = toscalar(noResults),
+      NoResultsRate = strcat(round(todouble(toscalar(noResults)) / todouble(toscalar(totalSearches)) * 100, 2), "%")
+
+// ----------------------------------------------------------------------------
+// 10. Session View Depth (How Many Sessions Users Check Before Deciding)
+// Helps understand user decision-making process
+// ----------------------------------------------------------------------------
+customEvents
+| where name == "SessionViewed"
+| where timestamp > ago(7d)
+| summarize SessionsViewed = count() by session_Id
+| summarize
+    Avg = avg(SessionsViewed),
+    Median = percentile(SessionsViewed, 50),
+    P75 = percentile(SessionsViewed, 75),
+    P95 = percentile(SessionsViewed, 95)
+| project
+    AvgSessionsViewedPerUser = round(Avg, 1),
+    MedianSessionsViewed = Median,
+    P75SessionsViewed = P75,
+    P95SessionsViewed = P95
+
+// ----------------------------------------------------------------------------
+// 11. Time to Signup (How Long from Search to Click)
+// Measures user decision speed
+// ----------------------------------------------------------------------------
+customEvents
+| where name == "SignupClicked"
+| where timestamp > ago(7d)
+| extend TimeToSignupMs = tolong(customDimensions.searchToClickDurationMs)
+| extend TimeToSignupMinutes = TimeToSignupMs / 60000.0
+| summarize
+    AvgMinutes = avg(TimeToSignupMinutes),
+    MedianMinutes = percentile(TimeToSignupMinutes, 50),
+    P95Minutes = percentile(TimeToSignupMinutes, 95)
+| project
+    AvgTimeToSignup = strcat(round(AvgMinutes, 1), " min"),
+    MedianTimeToSignup = strcat(round(MedianMinutes, 1), " min"),
+    P95TimeToSignup = strcat(round(P95Minutes, 1), " min")
+
+// ----------------------------------------------------------------------------
+// 12. Filter Usage Patterns (What Users Actually Search For)
+// Understand which filters are most important
+// ----------------------------------------------------------------------------
+customEvents
+| where name == "SearchStarted"
+| where timestamp > ago(7d)
+| extend filters = parse_json(tostring(customDimensions.filters))
+| extend hasAge = isnotnull(filters.childAge)
+| extend hasDays = isnotnull(filters.daysOfWeek)
+| extend hasGeography = isnotnull(filters.geographyIds)
+| extend hasTime = isnotnull(filters.timeWindow)
+| extend hasPrice = isnotnull(filters.priceMax)
+| summarize
+    TotalSearches = count(),
+    WithAge = countif(hasAge),
+    WithDays = countif(hasDays),
+    WithGeography = countif(hasGeography),
+    WithTime = countif(hasTime),
+    WithPrice = countif(hasPrice)
+| project
+    TotalSearches,
+    AgeFilter = strcat(round(todouble(WithAge) / TotalSearches * 100, 1), "%"),
+    DaysFilter = strcat(round(todouble(WithDays) / TotalSearches * 100, 1), "%"),
+    GeographyFilter = strcat(round(todouble(WithGeography) / TotalSearches * 100, 1), "%"),
+    TimeFilter = strcat(round(todouble(WithTime) / TotalSearches * 100, 1), "%"),
+    PriceFilter = strcat(round(todouble(WithPrice) / TotalSearches * 100, 1), "%")
+
+// ----------------------------------------------------------------------------
+// 13. Abandonment by No Results (Users Who Got Zero Results and Left)
+// Track if no-results is a major abandonment cause
+// ----------------------------------------------------------------------------
+customEvents
+| where timestamp > ago(7d)
+| where name in ("NoResults", "SignupClicked")
+| summarize Events = make_set(name) by session_Id
+| extend GotNoResults = array_length(Events) == 1 and Events[0] == "NoResults"
+| extend EventuallyConverted = Events contains "SignupClicked"
+| summarize
+    TotalNoResultsSessions = countif(GotNoResults),
+    NoResultsAbandoned = countif(GotNoResults and not(EventuallyConverted)),
+    NoResultsConverted = countif(GotNoResults and EventuallyConverted)
+| extend AbandonmentRate = strcat(round(todouble(NoResultsAbandoned) / TotalNoResultsSessions * 100, 1), "%")
+| project TotalNoResultsSessions, NoResultsAbandoned, NoResultsConverted, AbandonmentRate
+
+// ----------------------------------------------------------------------------
+// 14. Filter Refinement Patterns (Users Adjusting Filters)
+// Track how many times users change filters before finding results
+// ----------------------------------------------------------------------------
+customEvents
+| where name == "FilterChanged"
+| where timestamp > ago(7d)
+| summarize FilterChanges = count() by session_Id
+| summarize
+    AvgChanges = avg(FilterChanges),
+    MedianChanges = percentile(FilterChanges, 50),
+    MaxChanges = max(FilterChanges),
+    SessionsWithChanges = count()
+| project
+    AvgFilterChangesPerSession = round(AvgChanges, 1),
+    MedianFilterChanges = MedianChanges,
+    MaxFilterChanges = MaxChanges,
+    SessionsWithFilterActivity = SessionsWithChanges
+
+// ----------------------------------------------------------------------------
+// 15. Abandonment Heatmap (When Do Users Leave?)
+// Shows at which step users are most likely to abandon
+// ----------------------------------------------------------------------------
+let sessionFlows = customEvents
+| where timestamp > ago(7d)
+| where name in ("SearchStarted", "SearchResultsReturned", "SessionViewed", "SignupClicked")
+| summarize Events = make_list(name) by session_Id
+| extend LastEvent = Events[array_length(Events) - 1]
+| summarize Count = count() by LastEvent;
+sessionFlows
+| extend AbandonmentPoint = case(
+    LastEvent == "SearchStarted", "Abandoned at Search (no results returned)",
+    LastEvent == "SearchResultsReturned", "Abandoned at Results (didn't view any)",
+    LastEvent == "SessionViewed", "Abandoned at Details (didn't click signup)",
+    LastEvent == "SignupClicked", "Completed (clicked signup)",
+    "Unknown"
+)
+| project AbandonmentPoint, Count
+| order by Count desc
+
+// ----------------------------------------------------------------------------
+// 16. Geolocation Permission Denial Rate (Abandonment Trigger)
+// Track if location permission denial causes abandonment
+// ----------------------------------------------------------------------------
+let geoDenied = customEvents
+    | where name == "GeolocationDenied"
+    | where timestamp > ago(7d)
+    | summarize GeoDeniedCount = count(), DeniedUsers = make_set(session_Id);
+let totalUsers = customEvents
+    | where name == "SearchStarted"
+    | where timestamp > ago(7d)
+    | summarize TotalUsers = dcount(session_Id);
+let deniedThenAbandoned = customEvents
+    | where timestamp > ago(7d)
+    | where session_Id in (toscalar(geoDenied | project set_union(DeniedUsers)))
+    | summarize Events = make_set(name) by session_Id
+    | extend Abandoned = not(Events contains "SignupClicked")
+    | summarize AbandonedCount = countif(Abandoned);
+geoDenied
+| extend TotalUsers = toscalar(totalUsers)
+| extend DeniedRate = strcat(round(todouble(GeoDeniedCount) / TotalUsers * 100, 1), "%")
+| extend AbandonedAfterDenial = toscalar(deniedThenAbandoned)
+| extend AbandonmentRate = strcat(round(todouble(AbandonedAfterDenial) / GeoDeniedCount * 100, 1), "%")
+| project GeoDeniedCount, DeniedRate, AbandonedAfterDenial, AbandonmentRate
+
+// ============================================================================
+// USER BEHAVIOR & ENGAGEMENT METRICS
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// 17. Daily Active Users (DAU) Trend
+// Track user growth over time
+// ----------------------------------------------------------------------------
+customEvents
+| where timestamp > ago(30d)
+| where name == "SearchStarted"
+| summarize DAU = dcount(user_Id) by bin(timestamp, 1d)
+| render timechart
+
+// ----------------------------------------------------------------------------
+// 18. Search Success Rate (Users Who Found Results)
+// Inverse of no-results rate
+// ----------------------------------------------------------------------------
+let searches = customEvents
+    | where name == "SearchStarted"
+    | where timestamp > ago(7d)
+    | summarize SearchCount = count();
+let withResults = customEvents
+    | where name == "SearchResultsReturned"
+    | where timestamp > ago(7d)
+    | extend resultCount = toint(customDimensions.resultCount)
+    | where resultCount > 0
+    | summarize WithResultsCount = count();
+searches
+| extend WithResults = toscalar(withResults)
+| extend SuccessRate = strcat(round(todouble(WithResults) / SearchCount * 100, 1), "%")
+| project TotalSearches = SearchCount, SearchesWithResults = WithResults, SuccessRate
+
+// ----------------------------------------------------------------------------
+// 19. Most Popular Filter Combinations
+// Understand what users are actually looking for
+// ----------------------------------------------------------------------------
+customEvents
+| where name == "SearchStarted"
+| where timestamp > ago(7d)
+| extend filters = parse_json(tostring(customDimensions.filters))
+| extend childAge = toint(filters.childAge)
+| extend daysOfWeek = tostring(filters.daysOfWeek)
+| extend geography = tostring(filters.geographyIds)
+| extend timeWindow = tostring(filters.timeWindow)
+| summarize Count = count() by childAge, daysOfWeek, geography, timeWindow
+| order by Count desc
+| take 20
+
+// ----------------------------------------------------------------------------
+// 20. Session Click Position Analysis (Are Top Results Relevant?)
+// If users click position 1-3, ranking is good. If they scroll deep, ranking is poor.
+// ----------------------------------------------------------------------------
+customEvents
+| where name == "SessionViewed"
+| where timestamp > ago(7d)
+| extend position = toint(customDimensions.position)
+| summarize Count = count() by position
+| order by position asc
+| take 10
+| render columnchart
+
+// ----------------------------------------------------------------------------
+// 21. Zero-Results Filter Combinations (Coverage Gaps)
+// Identify which filter combos produce no results (need more data)
+// ----------------------------------------------------------------------------
+customEvents
+| where name == "NoResults"
+| where timestamp > ago(7d)
+| extend filters = parse_json(tostring(customDimensions.filters))
+| extend geography = tostring(filters.geographyIds)
+| extend daysOfWeek = tostring(filters.daysOfWeek)
+| extend childAge = toint(filters.childAge)
+| summarize NoResultsCount = count() by geography, daysOfWeek, childAge
+| order by NoResultsCount desc
+| take 20
+
+// ----------------------------------------------------------------------------
+// 22. User Journey Duration (Time Spent on Platform)
+// How long from first search to signup or abandonment?
+// ----------------------------------------------------------------------------
+customEvents
+| where timestamp > ago(7d)
+| where name in ("SearchStarted", "SignupClicked")
+| summarize FirstEvent = min(timestamp), LastEvent = max(timestamp) by session_Id
+| extend JourneyDurationMinutes = (LastEvent - FirstEvent) / 1m
+| summarize
+    AvgDuration = avg(JourneyDurationMinutes),
+    MedianDuration = percentile(JourneyDurationMinutes, 50),
+    P95Duration = percentile(JourneyDurationMinutes, 95)
+| project
+    AvgJourneyTime = strcat(round(AvgDuration, 1), " min"),
+    MedianJourneyTime = strcat(round(MedianDuration, 1), " min"),
+    P95JourneyTime = strcat(round(P95Duration, 1), " min")
+
+// ----------------------------------------------------------------------------
+// 23. Immediate Bounce Rate (Users Who Search Once and Leave)
+// Track users who do one search and never come back
+// ----------------------------------------------------------------------------
+customEvents
+| where timestamp > ago(7d)
+| where name == "SearchStarted"
+| summarize SearchCount = count() by session_Id
+| extend ImmediateBounce = SearchCount == 1
+| summarize
+    TotalSessions = count(),
+    BounceSessions = countif(ImmediateBounce)
+| extend BounceRate = strcat(round(todouble(BounceSessions) / TotalSessions * 100, 1), "%")
+| project TotalSessions, BounceSessions, BounceRate
+
+// ----------------------------------------------------------------------------
+// 24. Search Refinement Journey (Multi-Search Sessions)
+// Track how users refine searches to find what they want
+// ----------------------------------------------------------------------------
+customEvents
+| where name == "SearchStarted"
+| where timestamp > ago(7d)
+| summarize SearchesPerSession = count() by session_Id
+| summarize
+    AvgSearches = avg(SearchesPerSession),
+    MedianSearches = percentile(SearchesPerSession, 50),
+    SingleSearch = countif(SearchesPerSession == 1),
+    TwoToFour = countif(SearchesPerSession >= 2 and SearchesPerSession <= 4),
+    FivePlus = countif(SearchesPerSession >= 5)
+| extend TotalSessions = SingleSearch + TwoToFour + FivePlus
+| project
+    AvgSearchesPerSession = round(AvgSearches, 1),
+    MedianSearchesPerSession = MedianSearches,
+    SingleSearchSessions = strcat(round(todouble(SingleSearch) / TotalSessions * 100, 1), "%"),
+    TwoToFourSearches = strcat(round(todouble(TwoToFour) / TotalSessions * 100, 1), "%"),
+    FivePlusSearches = strcat(round(todouble(FivePlus) / TotalSessions * 100, 1), "%")
+
+// ----------------------------------------------------------------------------
+// 25. Top Abandonment Reasons (Error Analysis)
+// Correlate errors with abandonment
+// ----------------------------------------------------------------------------
+let errorSessions = customEvents
+    | where name == "Error"
+    | where timestamp > ago(7d)
+    | summarize ErrorTypes = make_set(tostring(customDimensions.errorType)) by session_Id;
+let abandonedSessions = customEvents
+    | where timestamp > ago(7d)
+    | summarize Events = make_set(name) by session_Id
+    | where not(Events contains "SignupClicked")
+    | project session_Id;
+errorSessions
+| join kind=inner abandonedSessions on session_Id
+| mv-expand ErrorType = ErrorTypes
+| summarize Count = count() by tostring(ErrorType)
+| order by Count desc
+
+// ----------------------------------------------------------------------------
+// 26. Relaxation Effectiveness (Do Expanded Searches Help?)
+// Track if no-results fallback strategy is working
+// ----------------------------------------------------------------------------
+customEvents
+| where name == "SearchResultsReturned"
+| where timestamp > ago(7d)
+| extend relaxationApplied = tobool(customDimensions.relaxationApplied)
+| extend resultCount = toint(customDimensions.resultCount)
+| summarize
+    TotalSearches = count(),
+    RelaxedSearches = countif(relaxationApplied),
+    RelaxedWithResults = countif(relaxationApplied and resultCount > 0),
+    RelaxedStillNoResults = countif(relaxationApplied and resultCount == 0)
+| extend RelaxationRate = strcat(round(todouble(RelaxedSearches) / TotalSearches * 100, 1), "%")
+| extend RelaxationSuccessRate = strcat(round(todouble(RelaxedWithResults) / RelaxedSearches * 100, 1), "%")
+| project TotalSearches, RelaxedSearches, RelaxationRate, RelaxedWithResults, RelaxationSuccessRate
+
+// ----------------------------------------------------------------------------
+// 27. User Cohort Analysis (New vs Returning Users)
+// Track if users come back after first visit
+// ----------------------------------------------------------------------------
+customEvents
+| where timestamp > ago(30d)
+| where name == "SearchStarted"
+| summarize FirstSeen = min(timestamp), LastSeen = max(timestamp), Sessions = dcount(session_Id) by user_Id
+| extend IsReturning = Sessions > 1
+| summarize
+    TotalUsers = count(),
+    NewUsers = countif(not(IsReturning)),
+    ReturningUsers = countif(IsReturning)
+| extend ReturnRate = strcat(round(todouble(ReturningUsers) / TotalUsers * 100, 1), "%")
+| project TotalUsers, NewUsers, ReturningUsers, ReturnRate
+
+// ============================================================================
+// COMBINED COST & BEHAVIOR DASHBOARD
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// 28. Cost Per Conversion (CPM - Cost Per Signup)
+// How much does each successful signup cost you?
+// ----------------------------------------------------------------------------
+let totalRUs = customMetrics
+    | where name == "cosmos_db_request_charge"
+    | where timestamp > ago(7d)
+    | summarize sum(value);
+let totalSignups = customEvents
+    | where name == "SignupClicked"
+    | where timestamp > ago(7d)
+    | summarize count();
+let estimatedCost = toscalar(totalRUs) * 0.25 / 1000000;
+print
+    TotalRUs = toscalar(totalRUs),
+    TotalSignups = toscalar(totalSignups),
+    EstimatedWeeklyCost = strcat("$", round(estimatedCost, 2)),
+    CostPerSignup = strcat("$", round(estimatedCost / toscalar(totalSignups), 4))
+
+// ----------------------------------------------------------------------------
+// 29. ROI Dashboard (Cost vs User Actions)
+// Shows value delivered per dollar spent
+// ----------------------------------------------------------------------------
+let costData = customMetrics
+    | where name == "cosmos_db_request_charge"
+    | where timestamp > ago(7d)
+    | summarize TotalRUs = sum(value)
+    | extend EstimatedCost = TotalRUs * 0.25 / 1000000;
+let userData = customEvents
+    | where timestamp > ago(7d)
+    | summarize
+        Searches = countif(name == "SearchStarted"),
+        Views = countif(name == "SessionViewed"),
+        Signups = countif(name == "SignupClicked"),
+        Users = dcount(user_Id);
+costData
+| extend Searches = toscalar(userData | project Searches)
+| extend Views = toscalar(userData | project Views)
+| extend Signups = toscalar(userData | project Signups)
+| extend Users = toscalar(userData | project Users)
+| project
+    EstimatedWeeklyCost = strcat("$", round(EstimatedCost, 2)),
+    TotalUsers = Users,
+    CostPerUser = strcat("$", round(EstimatedCost / Users, 4)),
+    TotalSignups = Signups,
+    CostPerSignup = strcat("$", round(EstimatedCost / Signups, 4)),
+    SearchesPerDollar = round(Searches / EstimatedCost, 0)

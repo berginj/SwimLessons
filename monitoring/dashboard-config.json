@@ -1,0 +1,194 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "dashboardName": {
+      "type": "string",
+      "defaultValue": "Swim Lessons - Cost & User Behavior"
+    },
+    "appInsightsResourceId": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource ID of Application Insights instance"
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Portal/dashboards",
+      "apiVersion": "2020-09-01-preview",
+      "name": "[parameters('dashboardName')]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "hidden-title": "Swim Lessons - Cost & Behavior Monitor"
+      },
+      "properties": {
+        "lenses": [
+          {
+            "order": 0,
+            "parts": [
+              {
+                "position": { "x": 0, "y": 0, "colSpan": 6, "rowSpan": 4 },
+                "metadata": {
+                  "type": "Extension/AppInsightsExtension/PartType/AnalyticsPart",
+                  "inputs": [
+                    {
+                      "name": "ComponentId",
+                      "value": "[parameters('appInsightsResourceId')]"
+                    },
+                    {
+                      "name": "Query",
+                      "value": "customMetrics | where name == 'cosmos_db_request_charge' | summarize TotalRUs = sum(value), EstimatedCost = sum(value) * 0.25 / 1000000 by bin(timestamp, 1d) | render timechart"
+                    },
+                    {
+                      "name": "TimeRange",
+                      "value": "P30D"
+                    }
+                  ],
+                  "settings": {
+                    "content": {
+                      "PartTitle": "Daily Cosmos DB Cost Trend",
+                      "PartSubTitle": "Estimated cost based on RU consumption"
+                    }
+                  }
+                }
+              },
+              {
+                "position": { "x": 6, "y": 0, "colSpan": 6, "rowSpan": 4 },
+                "metadata": {
+                  "type": "Extension/AppInsightsExtension/PartType/AnalyticsPart",
+                  "inputs": [
+                    {
+                      "name": "ComponentId",
+                      "value": "[parameters('appInsightsResourceId')]"
+                    },
+                    {
+                      "name": "Query",
+                      "value": "let searches = customEvents | where name == 'SearchStarted' | where timestamp > ago(7d) | summarize count(); let results = customEvents | where name == 'SearchResultsReturned' | where timestamp > ago(7d) | summarize count(); let views = customEvents | where name == 'SessionViewed' | where timestamp > ago(7d) | summarize count(); let signups = customEvents | where name == 'SignupClicked' | where timestamp > ago(7d) | summarize count(); print Searches = toscalar(searches), Results = toscalar(results), Views = toscalar(views), Signups = toscalar(signups) | extend SearchToResults = round(todouble(Results) / Searches * 100, 1), ResultsToView = round(todouble(Views) / Results * 100, 1), ViewToSignup = round(todouble(Signups) / Views * 100, 1), OverallConversion = round(todouble(Signups) / Searches * 100, 1)"
+                    }
+                  ],
+                  "settings": {
+                    "content": {
+                      "PartTitle": "User Funnel Conversion (Last 7 Days)",
+                      "PartSubTitle": "Search → Results → View → Signup"
+                    }
+                  }
+                }
+              },
+              {
+                "position": { "x": 0, "y": 4, "colSpan": 4, "rowSpan": 3 },
+                "metadata": {
+                  "type": "Extension/AppInsightsExtension/PartType/AnalyticsPart",
+                  "inputs": [
+                    {
+                      "name": "ComponentId",
+                      "value": "[parameters('appInsightsResourceId')]"
+                    },
+                    {
+                      "name": "Query",
+                      "value": "customEvents | where timestamp > ago(7d) | where name in ('SearchStarted', 'SearchResultsReturned', 'SessionViewed', 'SignupClicked') | summarize Events = make_list(name) by session_Id | extend LastEvent = Events[array_length(Events) - 1] | summarize Count = count() by LastEvent | extend AbandonmentPoint = case(LastEvent == 'SearchStarted', 'At Search', LastEvent == 'SearchResultsReturned', 'At Results', LastEvent == 'SessionViewed', 'At Details', LastEvent == 'SignupClicked', 'Completed', 'Unknown') | project AbandonmentPoint, Count | render piechart"
+                    }
+                  ],
+                  "settings": {
+                    "content": {
+                      "PartTitle": "Abandonment Points",
+                      "PartSubTitle": "Where users drop off"
+                    }
+                  }
+                }
+              },
+              {
+                "position": { "x": 4, "y": 4, "colSpan": 4, "rowSpan": 3 },
+                "metadata": {
+                  "type": "Extension/AppInsightsExtension/PartType/AnalyticsPart",
+                  "inputs": [
+                    {
+                      "name": "ComponentId",
+                      "value": "[parameters('appInsightsResourceId')]"
+                    },
+                    {
+                      "name": "Query",
+                      "value": "customEvents | where name == 'NoResults' | where timestamp > ago(7d) | extend filters = parse_json(tostring(customDimensions.filters)) | extend geography = tostring(filters.geographyIds) | extend daysOfWeek = tostring(filters.daysOfWeek) | summarize NoResultsCount = count() by geography, daysOfWeek | order by NoResultsCount desc | take 10"
+                    }
+                  ],
+                  "settings": {
+                    "content": {
+                      "PartTitle": "Top No-Results Filter Combinations",
+                      "PartSubTitle": "Coverage gaps to address"
+                    }
+                  }
+                }
+              },
+              {
+                "position": { "x": 8, "y": 4, "colSpan": 4, "rowSpan": 3 },
+                "metadata": {
+                  "type": "Extension/AppInsightsExtension/PartType/AnalyticsPart",
+                  "inputs": [
+                    {
+                      "name": "ComponentId",
+                      "value": "[parameters('appInsightsResourceId')]"
+                    },
+                    {
+                      "name": "Query",
+                      "value": "customEvents | where timestamp > ago(30d) | where name == 'SearchStarted' | summarize DAU = dcount(user_Id) by bin(timestamp, 1d) | render timechart"
+                    }
+                  ],
+                  "settings": {
+                    "content": {
+                      "PartTitle": "Daily Active Users (Last 30 Days)",
+                      "PartSubTitle": "User growth trend"
+                    }
+                  }
+                }
+              },
+              {
+                "position": { "x": 0, "y": 7, "colSpan": 6, "rowSpan": 3 },
+                "metadata": {
+                  "type": "Extension/AppInsightsExtension/PartType/AnalyticsPart",
+                  "inputs": [
+                    {
+                      "name": "ComponentId",
+                      "value": "[parameters('appInsightsResourceId')]"
+                    },
+                    {
+                      "name": "Query",
+                      "value": "let totalRUs = customMetrics | where name == 'cosmos_db_request_charge' | where timestamp > ago(7d) | summarize sum(value); let totalSignups = customEvents | where name == 'SignupClicked' | where timestamp > ago(7d) | summarize count(); let estimatedCost = toscalar(totalRUs) * 0.25 / 1000000; print TotalRUs = toscalar(totalRUs), TotalSignups = toscalar(totalSignups), EstimatedWeeklyCost = round(estimatedCost, 2), CostPerSignup = round(estimatedCost / toscalar(totalSignups), 4)"
+                    }
+                  ],
+                  "settings": {
+                    "content": {
+                      "PartTitle": "Cost Per Conversion (Last 7 Days)",
+                      "PartSubTitle": "How much each signup costs"
+                    }
+                  }
+                }
+              },
+              {
+                "position": { "x": 6, "y": 7, "colSpan": 6, "rowSpan": 3 },
+                "metadata": {
+                  "type": "Extension/AppInsightsExtension/PartType/AnalyticsPart",
+                  "inputs": [
+                    {
+                      "name": "ComponentId",
+                      "value": "[parameters('appInsightsResourceId')]"
+                    },
+                    {
+                      "name": "Query",
+                      "value": "customEvents | where name == 'SessionViewed' | where timestamp > ago(7d) | extend position = toint(customDimensions.position) | summarize ClickCount = count() by position | order by position asc | take 10 | render columnchart"
+                    }
+                  ],
+                  "settings": {
+                    "content": {
+                      "PartTitle": "Session Click Position Distribution",
+                      "PartSubTitle": "Are top results relevant?"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
