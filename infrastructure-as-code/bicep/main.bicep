@@ -79,14 +79,14 @@ module appInsights 'modules/application-insights.bicep' = {
   }
 }
 
-// === Azure Static Web App (Free Tier) ===
+// === Azure Static Web App (Standard tier required for linked backend) ===
 module staticWebApp 'modules/static-web-app.bicep' = {
   name: 'staticWebApp-deployment'
   params: {
     staticWebAppName: 'swa-swim-${resourceSuffix}'
     location: location
     tags: tags
-    sku: 'Free'
+    sku: 'Standard'
     functionsApiBackendResourceId: functionApps.outputs.functionAppResourceId
   }
 }

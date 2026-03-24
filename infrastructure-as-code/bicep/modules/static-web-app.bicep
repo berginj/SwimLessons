@@ -1,5 +1,5 @@
 /**
- * Azure Static Web App Module (Free Tier)
+ * Azure Static Web App Module
  */
 
 @description('Static Web App name')
