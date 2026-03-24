@@ -6,7 +6,10 @@
       "value": "staging"
     },
     "location": {
-      "value": "eastus"
+      "value": "centralus"
+    },
+    "resourceSuffix": {
+      "value": "stg01c"
     },
     "tags": {
       "value": {
