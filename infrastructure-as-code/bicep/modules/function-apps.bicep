@@ -24,18 +24,6 @@ param keyVaultName string
 @description('Cosmos DB database ID')
 param cosmosDatabaseId string = 'swimlessons'
 
-var managedAppSettings = {
-  AzureWebJobsStorage: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
-  FUNCTIONS_EXTENSION_VERSION: '~4'
-  FUNCTIONS_WORKER_RUNTIME: 'node'
-  APPLICATIONINSIGHTS_CONNECTION_STRING: appInsights.properties.ConnectionString
-  COSMOS_CONNECTION_STRING: cosmosConnectionString
-  COSMOS_DATABASE_ID: cosmosDatabaseId
-  APP_CONFIG_ENDPOINT: appConfigEndpoint
-  KEY_VAULT_NAME: keyVaultName
-  ENVIRONMENT: tags.environment
-}
-
 // Storage account for Function App (required)
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   name: 'st${replace(functionAppName, '-', '')}' // Remove hyphens, max 24 chars
@@ -91,18 +79,46 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
     httpsOnly: true
     siteConfig: {
       linuxFxVersion: 'NODE|22'
+      appSettings: [
+        {
+          name: 'AzureWebJobsStorage'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
+        }
+        {
+          name: 'FUNCTIONS_EXTENSION_VERSION'
+          value: '~4'
+        }
+        {
+          name: 'FUNCTIONS_WORKER_RUNTIME'
+          value: 'node'
+        }
+        {
+          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+          value: appInsights.properties.ConnectionString
+        }
+        {
+          name: 'COSMOS_CONNECTION_STRING'
+          value: cosmosConnectionString
+        }
+        {
+          name: 'COSMOS_DATABASE_ID'
+          value: cosmosDatabaseId
+        }
+        {
+          name: 'APP_CONFIG_ENDPOINT'
+          value: appConfigEndpoint
+        }
+        {
+          name: 'KEY_VAULT_NAME'
+          value: keyVaultName
+        }
+        {
+          name: 'ENVIRONMENT'
+          value: tags.environment
+        }
+      ]
     }
   }
-}
-
-// Keep platform-managed deployment settings like WEBSITE_RUN_FROM_PACKAGE intact on infra redeploys.
-resource functionAppSettings 'Microsoft.Web/sites/config@2023-01-01' = {
-  parent: functionApp
-  name: 'appsettings'
-  properties: union(
-    list('${functionApp.id}/config/appsettings', '2023-01-01').properties,
-    managedAppSettings
-  )
 }
 
 output functionAppUrl string = 'https://${functionApp.properties.defaultHostName}'
