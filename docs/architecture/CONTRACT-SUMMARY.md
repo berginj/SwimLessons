@@ -34,6 +34,16 @@ This means:
 
 ---
 
+## 🚢 Deployment Contract
+
+Deployment behavior is also contract-driven now.
+
+- [DEPLOYMENT-CONTRACT.md](./DEPLOYMENT-CONTRACT.md) defines the repo's deployment invariants.
+- CI enforces the deployment contract with `npm run validate:deployment-contract`.
+- Changes to GitHub workflows, Bicep deployment ownership, or SWA backend linking must satisfy that contract before merge.
+
+---
+
 ## 🔗 Integration Map (Who Calls Who?)
 
 ```

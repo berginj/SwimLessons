@@ -11,6 +11,7 @@
 
 ### 🚀 Start Here
 **👉 [CONTRACT-SUMMARY.md](./CONTRACT-SUMMARY.md)** - Quick reference guide for all contracts
+**👉 [DEPLOYMENT-CONTRACT.md](./DEPLOYMENT-CONTRACT.md)** - Deployment ownership, sequence, and anti-drift rules
 
 ### 📖 Deep Dives
 1. **[integration-flows.md](./integration-flows.md)** - Data flow diagrams, dependency graphs

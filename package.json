@@ -8,6 +8,7 @@
     "build": "tsc",
     "build:functions:deploy": "node scripts/build-functions-deploy.mjs",
     "build:watch": "tsc --watch",
+    "validate:deployment-contract": "node scripts/validate-deployment-contract.mjs",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,json,md}\"",
