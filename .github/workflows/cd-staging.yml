@@ -128,7 +128,7 @@ jobs:
   run-smoke-tests:
     name: Run Smoke Tests
     runs-on: ubuntu-latest
-    needs: [deploy-functions, deploy-web-app]
+    needs: [deploy-infrastructure, deploy-functions, deploy-web-app]
 
     steps:
       - name: Checkout code
