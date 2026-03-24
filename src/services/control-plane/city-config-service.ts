@@ -9,6 +9,70 @@ import { CityConfig, TenantCatalog } from '@core/contracts/city-config';
 import { ValidationResult } from '@core/models/canonical-schema';
 import { CityNotFoundError, ValidationError } from '@core/errors/app-errors';
 
+function createDefaultNycCityConfig(): CityConfig {
+  const timestamp = new Date().toISOString();
+
+  return {
+    cityId: 'nyc',
+    displayName: 'New York City',
+    timezone: 'America/New_York',
+    locale: 'en-US',
+    geographies: [
+      { id: 'manhattan', displayName: 'Manhattan', type: 'borough' },
+      { id: 'brooklyn', displayName: 'Brooklyn', type: 'borough' },
+      { id: 'queens', displayName: 'Queens', type: 'borough' },
+      { id: 'bronx', displayName: 'Bronx', type: 'borough' },
+      { id: 'staten-island', displayName: 'Staten Island', type: 'borough' },
+    ],
+    defaultCenter: {
+      latitude: 40.758,
+      longitude: -73.9855,
+    },
+    defaultZoomLevel: 11,
+    transitModes: [
+      { mode: 'subway', displayName: 'Subway', maxReasonableMinutes: 60 },
+      { mode: 'bus', displayName: 'Bus', maxReasonableMinutes: 60 },
+      { mode: 'walking', displayName: 'Walking', maxReasonableMinutes: 25 },
+    ],
+    transitProvider: 'mta',
+    registrationPatterns: [
+      {
+        name: 'NYC Parks Online',
+        urlPattern: 'https://www.nycgovparks.org/programs/swimming',
+        requiresResidency: false,
+      },
+    ],
+    typicalSeasonStart: { month: 6, day: 1 },
+    typicalSeasonEnd: { month: 8, day: 31 },
+    adapterConfig: {
+      type: 'manual',
+      syncSchedule: '0 2 * * *',
+      confidence: 'low',
+    },
+    searchProfile: {
+      defaultSort: 'startDate',
+      rankingWeights: {
+        recency: 0.35,
+        proximity: 0.3,
+        availability: 0.2,
+        quality: 0.15,
+      },
+      noResultsFallback: {
+        expandRadiusMiles: [2, 5, 10],
+        relaxDayConstraints: true,
+        relaxTimeConstraints: true,
+      },
+    },
+    features: {
+      transitETA: true,
+      providerSelfServe: false,
+    },
+    status: 'active',
+    onboardedAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
 /**
  * City configuration service with caching
  */
@@ -29,7 +93,14 @@ export class CityConfigService implements ICityConfigService {
     // Fetch from database
     const tenant = await this.tenantRepo.getById(cityId);
     if (!tenant) {
-      return null;
+      const fallbackConfig = this.getDefaultCityConfig(cityId);
+      if (!fallbackConfig) {
+        return null;
+      }
+
+      this.cache.set(cityId, fallbackConfig);
+      this.cacheTimestamps.set(cityId, Date.now());
+      return fallbackConfig;
     }
 
     // Cache and return
@@ -43,7 +114,20 @@ export class CityConfigService implements ICityConfigService {
     const filter = includePreview ? undefined : { status: 'active' as const };
 
     const tenants = await this.tenantRepo.list(filter);
-    return tenants.map((t) => t.cityConfig);
+    if (tenants.length > 0) {
+      return tenants.map((t) => t.cityConfig);
+    }
+
+    const fallbackConfig = this.getDefaultCityConfig('nyc');
+    if (!fallbackConfig) {
+      return [];
+    }
+
+    if (!includePreview && fallbackConfig.status !== 'active') {
+      return [];
+    }
+
+    return [fallbackConfig];
   }
 
   async createCity(config: CityConfig): Promise<CityConfig> {
@@ -257,5 +341,13 @@ export class CityConfigService implements ICityConfigService {
     }
 
     return cached;
+  }
+
+  private getDefaultCityConfig(cityId: string): CityConfig | null {
+    if (cityId !== 'nyc') {
+      return null;
+    }
+
+    return createDefaultNycCityConfig();
   }
 }

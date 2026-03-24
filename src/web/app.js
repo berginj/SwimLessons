@@ -207,6 +207,12 @@ function renderCityOptions() {
   elements.cityId.innerHTML = state.cities
     .map((city) => `<option value="${city.cityId}">${escapeHtml(city.displayName)}</option>`)
     .join('');
+
+  const preferredCityId = state.cities.some((city) => city.cityId === 'nyc')
+    ? 'nyc'
+    : (state.cities[0]?.cityId || '');
+
+  elements.cityId.value = preferredCityId;
 }
 
 function renderDayChips() {
