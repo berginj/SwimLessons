@@ -35,7 +35,7 @@ const nycConfig: Partial<CityConfig> = {
   adapterConfig: {
     type: 'nyc-doe',
     syncSchedule: '0 2 * * *',
-    apiEndpoint: path.join(__dirname, '../data/nyc-pools-geocoded.csv'),
+    apiEndpoint: path.join(process.cwd(), 'data/nyc-pools-geocoded.csv'),
     confidence: 'high',
   },
 } as CityConfig;
