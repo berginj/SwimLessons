@@ -13,7 +13,11 @@
 
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 dotenv.config({ path: '../.env' });
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 import { CosmosClient } from '@azure/cosmos';
 import { NYCDOEAdapter } from '../dist/adapters/nyc/nyc-doe-adapter.js';
@@ -35,7 +39,7 @@ const nycConfig: Partial<CityConfig> = {
   adapterConfig: {
     type: 'nyc-doe',
     syncSchedule: '0 2 * * *',
-    apiEndpoint: path.join(process.cwd(), 'data/nyc-pools-geocoded.csv'),
+    apiEndpoint: path.resolve(__dirname, '../data/nyc-pools-geocoded.csv'),
     confidence: 'high',
   },
 } as CityConfig;
