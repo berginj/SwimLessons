@@ -19,6 +19,7 @@ import { Coordinates, TransitMode } from '@core/contracts/city-config';
 import { TransitEstimate } from '@core/models/canonical-schema';
 import { ITransitService } from '@core/contracts/services';
 import { getEnvNumber, getEnvOptional } from '@core/utils/env';
+import { GoogleMapsTransitService } from './google-maps-transit';
 
 interface OtpPlanResponse {
   data?: {
@@ -42,6 +43,12 @@ interface OtpPlanResponse {
 export class TransitService implements ITransitService {
   private readonly transitRouterGraphqlUrl = getEnvOptional('TRANSIT_ROUTER_GRAPHQL_URL', '').trim();
   private readonly transitRouterTimeoutMs = getEnvNumber('TRANSIT_ROUTER_TIMEOUT_MS', 2500);
+  private readonly googleMapsService: GoogleMapsTransitService | null;
+
+  constructor() {
+    const googleMapsApiKey = getEnvOptional('GOOGLE_MAPS_API_KEY', '').trim();
+    this.googleMapsService = googleMapsApiKey ? new GoogleMapsTransitService(googleMapsApiKey) : null;
+  }
 
   /**
    * Speed estimates by transit mode type (mph)
@@ -74,6 +81,19 @@ export class TransitService implements ITransitService {
   ): Promise<TransitEstimate | null> {
     try {
       const distanceMiles = this.calculateHaversineDistance(origin, destination);
+
+      // Try Google Maps first (if available)
+      if (this.googleMapsService && cityId === 'nyc') {
+        const googleEstimate = await this.googleMapsEstimate(
+          origin,
+          destination,
+          mode,
+          departureTime
+        );
+        if (googleEstimate) {
+          return googleEstimate;
+        }
+      }
 
       if (cityId === 'nyc') {
         const routedEstimate = await this.estimateNycTransitTimeFromRouter(
