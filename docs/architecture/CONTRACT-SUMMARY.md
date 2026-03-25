@@ -42,6 +42,16 @@ Deployment behavior is also contract-driven now.
 - CI enforces the deployment contract with `npm run validate:deployment-contract`.
 - Changes to GitHub workflows, Bicep deployment ownership, or SWA backend linking must satisfy that contract before merge.
 
+## 🧭 Active Work Tracking
+
+Use [ORCHESTRATION-TRACKER.md](./ORCHESTRATION-TRACKER.md) as the canonical pickup document for:
+- current operational state
+- active backlog and priorities
+- dependency-aware next steps
+- contract drift and blockers
+
+Do not treat older root-level status docs as the live workboard unless the orchestration tracker points to them.
+
 ---
 
 ## 🔗 Integration Map (Who Calls Who?)
