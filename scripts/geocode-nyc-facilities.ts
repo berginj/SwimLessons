@@ -281,8 +281,8 @@ async function geocodeFacilities(inputPath: string, outputPath: string): Promise
  * Main execution
  */
 async function main() {
-  const inputPath = path.join(__dirname, '../data/nyc-pools-sample.csv');
-  const outputPath = path.join(__dirname, '../data/nyc-pools-geocoded.csv');
+  const inputPath = path.join(process.cwd(), '../data/nyc-pools-sample.csv');
+  const outputPath = path.join(process.cwd(), '../data/nyc-pools-geocoded.csv');
 
   if (!fs.existsSync(inputPath)) {
     console.error(`❌ Input file not found: ${inputPath}`);
