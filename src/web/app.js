@@ -1,6 +1,8 @@
 import telemetry from './telemetry.js';
 
 const API_BASE = window.SWIM_API_BASE_URL || '/api';
+const DEFAULT_TRANSIT_ORIGIN_LABEL = 'Times Square';
+const DEFAULT_TRANSIT_ORIGIN = { latitude: 40.758, longitude: -73.9855 };
 
 const DAY_OPTIONS = [
   { value: 0, label: 'Sun' },
@@ -47,6 +49,7 @@ const demoStore = {
       programDescription: 'A low-friction beginner class for kids who are getting comfortable in the water.',
       skillLevel: 'beginner',
       distanceLabel: 'LES',
+      coordinates: { latitude: 40.718, longitude: -73.9839 },
       providerId: 'nyc-provider-nycparks',
       locationId: 'nyc-location-hamilton-fish',
       programId: 'nyc-program-beginner',
@@ -69,6 +72,7 @@ const demoStore = {
       programDescription: 'Weekend preschool sessions designed for parents who need a consistent Saturday slot.',
       skillLevel: 'beginner',
       distanceLabel: 'Park Slope',
+      coordinates: { latitude: 40.6687, longitude: -73.9804 },
       providerId: 'nyc-provider-ymca',
       locationId: 'nyc-location-prospect-park-ymca',
       programId: 'nyc-program-weekend-preschool',
@@ -91,6 +95,7 @@ const demoStore = {
       programDescription: 'A stronger stroke-development track for kids ready to move beyond basics.',
       skillLevel: 'intermediate',
       distanceLabel: 'Upper West Side',
+      coordinates: { latitude: 40.7817, longitude: -73.9818 },
       providerId: 'nyc-provider-jcc',
       locationId: 'nyc-location-jcc',
       programId: 'nyc-program-intermediate',
@@ -113,6 +118,7 @@ const demoStore = {
       programDescription: 'Evening lane work for older kids building stamina and technique.',
       skillLevel: 'advanced',
       distanceLabel: 'Upper East Side',
+      coordinates: { latitude: 40.7796, longitude: -73.9448 },
       providerId: 'nyc-provider-asphalt-green',
       locationId: 'nyc-location-asphalt-green',
       programId: 'nyc-program-advanced',
@@ -135,6 +141,7 @@ const demoStore = {
       programDescription: 'A family-friendly starter class with smaller groups and gentler pacing.',
       skillLevel: 'beginner',
       distanceLabel: 'Astoria',
+      coordinates: { latitude: 40.7644, longitude: -73.9169 },
       providerId: 'nyc-provider-elite',
       locationId: 'nyc-location-astoria-lab',
       programId: 'nyc-program-family-starter',
@@ -381,6 +388,8 @@ function searchDemoData() {
 }
 
 function createDemoSearchResult(session) {
+  const travelEstimate = estimateDemoTransit(session);
+
   return {
     session: {
       id: session.id,
@@ -401,11 +410,13 @@ function createDemoSearchResult(session) {
       name: session.providerName,
       verified: true,
     },
+    distance: travelEstimate.distance,
+    travelTime: travelEstimate.travelTime,
     location: {
       id: session.locationId,
       name: session.locationName,
       address: session.locationAddress,
-      coordinates: { latitude: 40.75, longitude: -73.98 },
+      coordinates: session.coordinates,
       facilityType: 'indoor',
     },
     program: {
@@ -427,6 +438,10 @@ function renderResults(results) {
   elements.results.innerHTML = '';
 
   for (const result of results) {
+    const travelSummary = result.travelTime
+      ? `<span class="travel-badge">${escapeHtml(formatTravelSummary(result.travelTime, result.distance))}</span>`
+      : '';
+
     const card = document.createElement('article');
     card.className = 'result-card';
     card.innerHTML = `
@@ -444,6 +459,7 @@ function renderResults(results) {
         <span>${formatDays(result.session?.daysOfWeek || [])}</span>
         <span>${formatTimeRange(result.session?.timeOfDay)}</span>
         <span>${formatDateRange(result.session?.startDate, result.session?.endDate)}</span>
+        ${travelSummary}
       </div>
       <div class="result-footer">
         <span class="availability-badge">${formatAvailability(result.session?.availableSpots)}</span>
@@ -516,7 +532,7 @@ function createDemoSessionDetails(sessionId) {
       address: {
         street: session.locationAddress,
       },
-      coordinates: { latitude: 40.75, longitude: -73.98 },
+      coordinates: session.coordinates,
       facilityType: 'indoor',
     },
     program: {
@@ -546,6 +562,12 @@ function renderDialog(details) {
     : '<p>No related upcoming sessions.</p>';
 
   const registrationUrl = details.session?.registrationUrl || 'https://example.com/';
+  const travelBlock = details.travelTime
+    ? `<div class="detail-block">
+        <h3>Travel</h3>
+        <p>${escapeHtml(formatTravelDetail(details.travelTime))}</p>
+      </div>`
+    : '';
 
   elements.dialogContent.innerHTML = `
     <div class="detail-grid">
@@ -567,6 +589,7 @@ function renderDialog(details) {
         <p>${formatDateRange(details.session?.startDate, details.session?.endDate)}</p>
         <p>${formatDays(details.session?.daysOfWeek || [])} · ${formatTimeRange(details.session?.timeOfDay)}</p>
       </div>
+      ${travelBlock}
       <div class="detail-block">
         <h3>Related sessions</h3>
         ${related}
@@ -610,6 +633,155 @@ async function fetchApi(path, init = {}) {
     throw new Error(`Request failed with status ${response.status}`);
   }
   return response.json();
+}
+
+function estimateDemoTransit(session) {
+  const distance = calculateHaversineDistance(DEFAULT_TRANSIT_ORIGIN, session.coordinates);
+  const departureHour = Number((session.timeOfDay?.start || '12:00').split(':')[0] || '12');
+  const isWeekend = (session.daysOfWeek || []).every((day) => day === 0 || day === 6);
+
+  const candidates = [
+    {
+      mode: 'walking',
+      minutes: (distance / 3.1) * 60,
+    },
+    {
+      mode: 'bus',
+      minutes:
+        Math.min(10, Math.max(3, distance * 2.2)) +
+        getDemoBusWaitMinutes(departureHour, isWeekend) +
+        (distance / getDemoBusSpeed(departureHour, isWeekend)) * 60 +
+        Math.min(8, Math.max(2, distance * 1.1)) +
+        (distance > 4 ? 4 : 0),
+    },
+    {
+      mode: 'subway',
+      minutes:
+        Math.min(14, Math.max(5, 4 + distance * 0.7)) +
+        getDemoSubwayWaitMinutes(departureHour, isWeekend) +
+        (distance / getDemoSubwaySpeed(departureHour, isWeekend)) * 60 +
+        Math.min(10, Math.max(4, 3 + distance * 0.5)) +
+        (distance > 5 ? 5 : distance > 2.5 ? 3 : 0),
+    },
+  ];
+
+  const best = candidates.reduce((currentBest, candidate) =>
+    candidate.minutes < currentBest.minutes ? candidate : currentBest
+  );
+
+  return {
+    distance: Math.round(distance * 10) / 10,
+    travelTime: {
+      minutes: Math.max(1, Math.round(best.minutes)),
+      mode: best.mode,
+      confidence: 'estimated',
+    },
+  };
+}
+
+function getDemoSubwaySpeed(hour, isWeekend) {
+  if (isWeekend) {
+    return 16;
+  }
+  if ((hour >= 7 && hour < 10) || (hour >= 16 && hour < 19)) {
+    return 16.5;
+  }
+  if (hour >= 22 || hour < 6) {
+    return 15;
+  }
+  if (hour >= 19) {
+    return 17;
+  }
+  return 18;
+}
+
+function getDemoBusSpeed(hour, isWeekend) {
+  if (isWeekend) {
+    return 7.5;
+  }
+  if ((hour >= 7 && hour < 10) || (hour >= 16 && hour < 19)) {
+    return 7.5;
+  }
+  if (hour >= 22 || hour < 6) {
+    return 7;
+  }
+  if (hour >= 19) {
+    return 8;
+  }
+  return 8.5;
+}
+
+function getDemoSubwayWaitMinutes(hour, isWeekend) {
+  if (isWeekend) {
+    return 7;
+  }
+  if ((hour >= 7 && hour < 10) || (hour >= 16 && hour < 19)) {
+    return 4.5;
+  }
+  if (hour >= 22 || hour < 6) {
+    return 8;
+  }
+  if (hour >= 19) {
+    return 6.5;
+  }
+  return 5.5;
+}
+
+function getDemoBusWaitMinutes(hour, isWeekend) {
+  if (isWeekend) {
+    return 10;
+  }
+  if ((hour >= 7 && hour < 10) || (hour >= 16 && hour < 19)) {
+    return 6.5;
+  }
+  if (hour >= 22 || hour < 6) {
+    return 11;
+  }
+  if (hour >= 19) {
+    return 8;
+  }
+  return 7.5;
+}
+
+function calculateHaversineDistance(origin, destination) {
+  const EARTH_RADIUS_MILES = 3959;
+  const toRadians = (degrees) => (degrees * Math.PI) / 180;
+  const lat1 = toRadians(origin.latitude);
+  const lat2 = toRadians(destination.latitude);
+  const deltaLat = toRadians(destination.latitude - origin.latitude);
+  const deltaLon = toRadians(destination.longitude - origin.longitude);
+  const a =
+    Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
+
+  return EARTH_RADIUS_MILES * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function formatTravelSummary(travelTime, distance) {
+  const distanceSuffix = Number.isFinite(distance) ? ` · ${distance.toFixed(1)} mi` : '';
+  return `~${travelTime.minutes} min by ${formatTransitMode(travelTime.mode)}${distanceSuffix}`;
+}
+
+function formatTravelDetail(travelTime) {
+  const distanceSuffix = Number.isFinite(travelTime.distance)
+    ? ` for about ${travelTime.distance.toFixed(1)} miles`
+    : '';
+  return `Approx. ${travelTime.minutes} min by ${formatTransitMode(
+    travelTime.mode
+  )} from ${DEFAULT_TRANSIT_ORIGIN_LABEL}${distanceSuffix}.`;
+}
+
+function formatTransitMode(mode) {
+  if (mode === 'subway') {
+    return 'subway';
+  }
+  if (mode === 'bus') {
+    return 'bus';
+  }
+  if (mode === 'walking') {
+    return 'walking';
+  }
+  return mode || 'transit';
 }
 
 function formatDays(days) {

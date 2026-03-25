@@ -21,6 +21,12 @@ param tags object = {
   managedBy: 'bicep'
 }
 
+@description('Optional external transit router GraphQL endpoint')
+param transitRouterGraphqlUrl string = ''
+
+@description('Transit router request timeout in milliseconds')
+param transitRouterTimeoutMs int = 2500
+
 // === Cosmos DB (Serverless Mode) ===
 module cosmosDb 'modules/cosmos-db.bicep' = {
   name: 'cosmosDb-deployment'
@@ -65,6 +71,8 @@ module functionApps 'modules/function-apps.bicep' = {
     cosmosDatabaseId: 'swimlessons'
     appConfigEndpoint: appConfiguration.outputs.endpoint
     keyVaultName: keyVault.outputs.vaultName
+    transitRouterGraphqlUrl: transitRouterGraphqlUrl
+    transitRouterTimeoutMs: transitRouterTimeoutMs
   }
 }
 

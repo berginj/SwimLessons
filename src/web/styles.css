@@ -109,6 +109,16 @@ body {
   font-size: 0.95rem;
 }
 
+.travel-note {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(13, 124, 134, 0.08);
+  color: var(--accent-strong);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
 .filters {
   display: grid;
   gap: 16px;
@@ -261,7 +271,8 @@ body {
 }
 
 .price-badge,
-.availability-badge {
+.availability-badge,
+.travel-badge {
   border-radius: 999px;
   padding: 7px 11px;
   font-size: 0.85rem;
@@ -275,6 +286,11 @@ body {
 .availability-badge {
   background: rgba(226, 167, 56, 0.16);
   color: #7c5411;
+}
+
+.travel-badge {
+  background: rgba(24, 49, 63, 0.08);
+  color: var(--text);
 }
 
 .dialog-actions {

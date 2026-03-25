@@ -74,15 +74,31 @@ export class SearchService implements ISearchService {
 
     // Phase 1: Query repository with database-level filters
     let sessions = await this.querySessions(filters, cityConfig);
+    const locationCoordinates = await this.loadLocationCoordinates(
+      sessions,
+      filters.cityId,
+      cityConfig.defaultCenter
+    );
 
     // Phase 2: Apply application-layer business filters
-    sessions = this.applyBusinessFilters(sessions, filters, cityConfig);
+    sessions = this.applyBusinessFilters(sessions, filters, cityConfig, locationCoordinates);
 
     // Phase 3: Score and rank all sessions
-    const scoredSessions = await this.scoreAndRank(sessions, filters, cityConfig);
+    const scoredSessions = await this.scoreAndRankWithLocationContext(
+      sessions,
+      filters,
+      cityConfig,
+      locationCoordinates
+    );
 
     // Phase 4: Sort by user preference
-    const sortedSessions = this.sortSessions(scoredSessions, sort);
+    const sortedSessions = this.sortSessions(
+      scoredSessions,
+      sort,
+      filters.origin,
+      cityConfig,
+      locationCoordinates
+    );
 
     // Phase 5: Check for no results and apply relaxation if needed
     let relaxationApplied = false;
@@ -143,12 +159,26 @@ export class SearchService implements ISearchService {
     filters: SearchFilters,
     cityConfig: CityConfig
   ): Promise<ScoredSession[]> {
+    return this.scoreAndRankWithLocationContext(sessions, filters, cityConfig);
+  }
+
+  private async scoreAndRankWithLocationContext(
+    sessions: Session[],
+    filters: SearchFilters,
+    cityConfig: CityConfig,
+    locationCoordinates?: Map<string, Coordinates>
+  ): Promise<ScoredSession[]> {
     const weights = cityConfig.searchProfile.rankingWeights;
 
     const scoredSessions = sessions.map((session) => {
       // Calculate individual scores (0-1 each)
       const recencyScore = this.calculateRecencyScore(session);
-      const proximityScore = this.calculateProximityScore(session, filters);
+      const proximityScore = this.calculateProximityScore(
+        session,
+        filters,
+        cityConfig,
+        locationCoordinates
+      );
       const availabilityScore = this.calculateAvailabilityScore(session);
       const qualityScore = this.calculateQualityScore(session);
 
@@ -225,7 +255,8 @@ export class SearchService implements ISearchService {
   private applyBusinessFilters(
     sessions: Session[],
     filters: SearchFilters,
-    cityConfig: CityConfig
+    cityConfig: CityConfig,
+    locationCoordinates?: Map<string, Coordinates>
   ): Session[] {
     return sessions.filter((session) => {
       // Age eligibility check
@@ -273,7 +304,7 @@ export class SearchService implements ISearchService {
       if (filters.origin && filters.maxTravelMinutes) {
         const distance = this.calculateHaversineDistance(
           filters.origin,
-          this.getSessionLocation(session, cityConfig)
+          this.getSessionLocation(session, cityConfig, locationCoordinates)
         );
         const maxTravelMiles = filters.maxTravelMinutes / 10; // Rough conversion: ~10 min per mile
         if (distance > maxTravelMiles) {
@@ -362,10 +393,12 @@ export class SearchService implements ISearchService {
    * @param cityConfig City configuration
    * @returns Approximate location or city center
    */
-  private getSessionLocation(session: Session, cityConfig: CityConfig): Coordinates {
-    // Placeholder: return city center
-    // Full implementation would denormalize location.coordinates to session
-    return cityConfig.defaultCenter;
+  private getSessionLocation(
+    session: Session,
+    cityConfig: CityConfig,
+    locationCoordinates?: Map<string, Coordinates>
+  ): Coordinates {
+    return locationCoordinates?.get(session.locationId) || cityConfig.defaultCenter;
   }
 
   /**
@@ -404,13 +437,20 @@ export class SearchService implements ISearchService {
    * @param filters Search filters (contains origin)
    * @returns Score 0-1, or 0 if no origin provided
    */
-  private calculateProximityScore(session: Session, filters: SearchFilters): number {
+  private calculateProximityScore(
+    session: Session,
+    filters: SearchFilters,
+    cityConfig: CityConfig,
+    locationCoordinates?: Map<string, Coordinates>
+  ): number {
     if (!filters.origin) {
       return 0.5; // Neutral score if no location provided
     }
 
-    // Would need denormalized location data - use placeholder
-    const distance = 5; // miles (placeholder)
+    const distance = this.calculateHaversineDistance(
+      filters.origin,
+      this.getSessionLocation(session, cityConfig, locationCoordinates)
+    );
 
     // Inverse distance function
     const score = 1 / (1 + distance);
@@ -507,17 +547,36 @@ export class SearchService implements ISearchService {
    * @param sort Sort field and direction
    * @returns Sorted sessions
    */
-  private sortSessions(sessions: ScoredSession[], sort: SortOptions): ScoredSession[] {
+  private sortSessions(
+    sessions: ScoredSession[],
+    sort: SortOptions,
+    origin: Coordinates | undefined,
+    cityConfig: CityConfig,
+    locationCoordinates?: Map<string, Coordinates>
+  ): ScoredSession[] {
     const sorted = [...sessions];
 
     sorted.sort((a, b) => {
       let comparison = 0;
 
       switch (sort.field) {
-        case 'distance':
-          // Would compare distances - placeholder
-          comparison = 0;
+        case 'distance': {
+          if (!origin) {
+            comparison = b.score - a.score;
+            break;
+          }
+
+          const distanceA = this.calculateHaversineDistance(
+            origin,
+            this.getSessionLocation(a.session, cityConfig, locationCoordinates)
+          );
+          const distanceB = this.calculateHaversineDistance(
+            origin,
+            this.getSessionLocation(b.session, cityConfig, locationCoordinates)
+          );
+          comparison = distanceA - distanceB;
           break;
+        }
 
         case 'startDate':
           const dateA = new Date(a.session.startDate).getTime();
@@ -580,10 +639,25 @@ export class SearchService implements ISearchService {
         };
 
         const sessions = await this.querySessions(relaxedFilters, cityConfig);
-        const filtered = this.applyBusinessFilters(sessions, relaxedFilters, cityConfig);
+        const locationCoordinates = await this.loadLocationCoordinates(
+          sessions,
+          filters.cityId,
+          cityConfig.defaultCenter
+        );
+        const filtered = this.applyBusinessFilters(
+          sessions,
+          relaxedFilters,
+          cityConfig,
+          locationCoordinates
+        );
 
         if (filtered.length > 0) {
-          const scored = await this.scoreAndRank(filtered, filters, cityConfig);
+          const scored = await this.scoreAndRankWithLocationContext(
+            filtered,
+            filters,
+            cityConfig,
+            locationCoordinates
+          );
           return { scoredSessions: scored, relaxationApplied: true };
         }
       }
@@ -598,10 +672,25 @@ export class SearchService implements ISearchService {
       };
 
       const sessions = await this.querySessions(relaxedFilters, cityConfig);
-      const filtered = this.applyBusinessFilters(sessions, relaxedFilters, cityConfig);
+      const locationCoordinates = await this.loadLocationCoordinates(
+        sessions,
+        filters.cityId,
+        cityConfig.defaultCenter
+      );
+      const filtered = this.applyBusinessFilters(
+        sessions,
+        relaxedFilters,
+        cityConfig,
+        locationCoordinates
+      );
 
       if (filtered.length > 0) {
-        const scored = await this.scoreAndRank(filtered, filters, cityConfig);
+        const scored = await this.scoreAndRankWithLocationContext(
+          filtered,
+          filters,
+          cityConfig,
+          locationCoordinates
+        );
         return { scoredSessions: scored, relaxationApplied: true };
       }
     }
@@ -615,10 +704,25 @@ export class SearchService implements ISearchService {
       };
 
       const sessions = await this.querySessions(relaxedFilters, cityConfig);
-      const filtered = this.applyBusinessFilters(sessions, relaxedFilters, cityConfig);
+      const locationCoordinates = await this.loadLocationCoordinates(
+        sessions,
+        filters.cityId,
+        cityConfig.defaultCenter
+      );
+      const filtered = this.applyBusinessFilters(
+        sessions,
+        relaxedFilters,
+        cityConfig,
+        locationCoordinates
+      );
 
       if (filtered.length > 0) {
-        const scored = await this.scoreAndRank(filtered, filters, cityConfig);
+        const scored = await this.scoreAndRankWithLocationContext(
+          filtered,
+          filters,
+          cityConfig,
+          locationCoordinates
+        );
         return { scoredSessions: scored, relaxationApplied: true };
       }
     }
@@ -686,5 +790,31 @@ export class SearchService implements ISearchService {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+  }
+
+  private async loadLocationCoordinates(
+    sessions: Session[],
+    cityId: string,
+    defaultCenter: Coordinates
+  ): Promise<Map<string, Coordinates>> {
+    const locationCoordinates = new Map<string, Coordinates>();
+    const uniqueLocationIds = Array.from(new Set(sessions.map((session) => session.locationId)));
+
+    const locations = await Promise.all(
+      uniqueLocationIds.map((locationId) =>
+        this.sessionRepository.getLocationById(locationId, cityId)
+      )
+    );
+
+    locations.forEach((location, index) => {
+      const locationId = uniqueLocationIds[index];
+      if (!locationId) {
+        return;
+      }
+
+      locationCoordinates.set(locationId, location?.coordinates || defaultCenter);
+    });
+
+    return locationCoordinates;
   }
 }

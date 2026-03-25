@@ -15,6 +15,11 @@ import {
 import { Coordinates } from '@core/contracts/city-config';
 import { getDependencies } from '../dependency-injection';
 import { AppError, isAppError, SessionNotFoundError } from '@core/errors/app-errors';
+import {
+  estimatePreferredTransitTime,
+  getRoutingOrigin,
+  getSessionDepartureTime,
+} from './transit-helpers';
 
 /**
  * Session details endpoint handler
@@ -106,7 +111,19 @@ export async function sessionDetails(
     );
 
     // Get dependencies
-    const { searchService, sessionRepository } = await getDependencies();
+    const { searchService, sessionRepository, cityConfigService, transitService } =
+      await getDependencies();
+    const cityConfig = await cityConfigService.getCityConfig(cityId);
+    if (!cityConfig) {
+      const errorResponse = ApiResponseBuilder.error(
+        ApiErrorCode.CITY_NOT_FOUND,
+        `City '${cityId}' not found`
+      );
+      return {
+        status: 404,
+        jsonBody: errorResponse,
+      };
+    }
 
     // Fetch session
     const session = await searchService.getSessionById(sessionId, cityId);
@@ -185,17 +202,26 @@ export async function sessionDetails(
       .slice(0, 5);
 
     // Build response
+    const routingOrigin = getRoutingOrigin(origin, cityConfig.defaultCenter);
+    const travelEstimate = await estimatePreferredTransitTime(
+      transitService,
+      cityId,
+      routingOrigin,
+      location.coordinates,
+      getSessionDepartureTime(session)
+    );
+
     const response: SessionDetailsResponse = {
       session,
       provider,
       location,
       program,
       relatedSessions: filteredRelated,
-      travelTime: origin
+      travelTime: travelEstimate
         ? {
-            minutes: calculateEstimatedTravelTime(location.coordinates, origin),
-            mode: 'transit',
-            distance: calculateDistance(location.coordinates, origin),
+            minutes: travelEstimate.durationMinutes,
+            mode: travelEstimate.mode,
+            distance: travelEstimate.distance,
           }
         : undefined,
     };
@@ -241,47 +267,6 @@ export async function sessionDetails(
       jsonBody: errorResponse,
     };
   }
-}
-
-/**
- * Calculate estimated travel time between two coordinates
- * Uses simple distance-based estimate: ~10 minutes per mile
- *
- * @param destination Location coordinates
- * @param origin User coordinates
- * @returns Estimated travel time in minutes
- */
-function calculateEstimatedTravelTime(destination: Coordinates, origin: Coordinates): number {
-  const distance = calculateDistance(destination, origin);
-  // Rough estimate: 10 minutes per mile
-  return Math.ceil(distance * 10);
-}
-
-/**
- * Calculate haversine distance between two coordinates
- *
- * @param coord1 First coordinate
- * @param coord2 Second coordinate
- * @returns Distance in miles
- */
-function calculateDistance(coord1: Coordinates, coord2: Coordinates): number {
-  const EARTH_RADIUS_MILES = 3959;
-
-  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
-
-  const lat1 = toRadians(coord1.latitude);
-  const lat2 = toRadians(coord2.latitude);
-  const deltaLat = toRadians(coord2.latitude - coord1.latitude);
-  const deltaLon = toRadians(coord2.longitude - coord1.longitude);
-
-  const a =
-    Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = EARTH_RADIUS_MILES * c;
-
-  return distance;
 }
 
 /**

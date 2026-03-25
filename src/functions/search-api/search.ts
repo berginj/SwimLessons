@@ -17,6 +17,14 @@ import {
 import { SearchFilters } from '@core/contracts/city-config';
 import { getDependencies } from '../dependency-injection';
 import { AppError, isAppError, ValidationError } from '@core/errors/app-errors';
+import {
+  estimatePreferredTransitTime,
+  formatLocationAddress,
+  getRoutingOrigin,
+  getSessionDepartureTime,
+} from './transit-helpers';
+
+const TRANSIT_ENRICHMENT_LIMIT = 10;
 
 /**
  * Search endpoint handler
@@ -73,7 +81,8 @@ export async function search(req: HttpRequest, context: InvocationContext): Prom
     }
 
     // Get dependencies
-    const { searchService, cityConfigService } = await getDependencies();
+    const { searchService, cityConfigService, sessionRepository, transitService } =
+      await getDependencies();
 
     // Verify city is active
     const cityConfig = await cityConfigService.getCityConfig(searchRequest.cityId);
@@ -114,7 +123,7 @@ export async function search(req: HttpRequest, context: InvocationContext): Prom
       geographyIds: searchRequest.filters.geographyIds,
       maxTravelMinutes: searchRequest.filters.maxTravelMinutes,
       priceMax: searchRequest.filters.priceMax,
-      origin: searchRequest.userContext?.origin,
+      origin: searchRequest.userContext?.origin ?? cityConfig.defaultCenter,
     };
 
     // Prepare sort options
@@ -128,6 +137,7 @@ export async function search(req: HttpRequest, context: InvocationContext): Prom
       skip: searchRequest.pagination?.skip ?? 0,
       take: searchRequest.pagination?.take ?? 20,
     };
+    const routingOrigin = getRoutingOrigin(searchFilters.origin, cityConfig.defaultCenter);
 
     context.log(
       `[${requestId}] Searching for sessions in city: ${searchRequest.cityId}, ` +
@@ -136,35 +146,93 @@ export async function search(req: HttpRequest, context: InvocationContext): Prom
 
     // Call search service
     const searchResults = await searchService.search(searchFilters, sortOptions, paginationOptions);
+    const providerCache = new Map<string, Awaited<ReturnType<typeof sessionRepository.getProviderById>>>();
+    const locationCache = new Map<string, Awaited<ReturnType<typeof sessionRepository.getLocationById>>>();
+    const programCache = new Map<string, Awaited<ReturnType<typeof sessionRepository.getProgramById>>>();
+
+    const loadProvider = async (providerId: string) => {
+      if (!providerCache.has(providerId)) {
+        providerCache.set(
+          providerId,
+          await sessionRepository.getProviderById(providerId, searchRequest.cityId)
+        );
+      }
+      return providerCache.get(providerId) || null;
+    };
+
+    const loadLocation = async (locationId: string) => {
+      if (!locationCache.has(locationId)) {
+        locationCache.set(
+          locationId,
+          await sessionRepository.getLocationById(locationId, searchRequest.cityId)
+        );
+      }
+      return locationCache.get(locationId) || null;
+    };
+
+    const loadProgram = async (programId: string) => {
+      if (!programCache.has(programId)) {
+        programCache.set(
+          programId,
+          await sessionRepository.getProgramById(programId, searchRequest.cityId)
+        );
+      }
+      return programCache.get(programId) || null;
+    };
 
     // Build response with denormalized data
     const response: SearchResponse = {
-      results: searchResults.results.map((session): SessionSearchResult => {
-        // In a full implementation, would fetch provider and location from repository
-        // For now, using denormalized data that should be in the session document
-        return {
-          session,
-          provider: {
-            id: session.providerId,
-            name: 'Provider Name', // Would be denormalized from session
-            logoUrl: undefined,
-            verified: true, // Would fetch from provider document
-          },
-          location: {
-            id: session.locationId,
-            name: 'Location Name',
-            address: 'Location Address',
-            coordinates: cityConfig.defaultCenter, // Would be denormalized from session
-            facilityType: 'indoor', // Would be denormalized
-          },
-          program: {
-            id: session.programId,
-            name: 'Program Name',
-            description: undefined,
-            skillLevel: 'beginner', // Would be denormalized
-          },
-        };
-      }),
+      results: await Promise.all(
+        searchResults.results.map(async (session, index): Promise<SessionSearchResult> => {
+          const [provider, location, program] = await Promise.all([
+            loadProvider(session.providerId),
+            loadLocation(session.locationId),
+            loadProgram(session.programId),
+          ]);
+
+          const shouldEstimateTransit = index < TRANSIT_ENRICHMENT_LIMIT;
+          const travelEstimate = location && shouldEstimateTransit
+            ? await estimatePreferredTransitTime(
+                transitService,
+                searchRequest.cityId,
+                routingOrigin,
+                location.coordinates,
+                getSessionDepartureTime(session)
+              )
+            : null;
+
+          return {
+            session,
+            distance: travelEstimate?.distance,
+            travelTime: travelEstimate
+              ? {
+                  minutes: travelEstimate.durationMinutes,
+                  mode: travelEstimate.mode,
+                  confidence: travelEstimate.confidence,
+                }
+              : undefined,
+            provider: {
+              id: session.providerId,
+              name: provider?.name || 'Unknown provider',
+              logoUrl: provider?.logoUrl,
+              verified: provider?.verified ?? false,
+            },
+            location: {
+              id: session.locationId,
+              name: location?.name || 'Unknown location',
+              address: formatLocationAddress(location?.address),
+              coordinates: location?.coordinates || cityConfig.defaultCenter,
+              facilityType: location?.facilityType || 'indoor',
+            },
+            program: {
+              id: session.programId,
+              name: program?.name || 'Swim program',
+              description: program?.description,
+              skillLevel: program?.skillLevel || 'all',
+            },
+          };
+        })
+      ),
       pagination: {
         skip: paginationOptions.skip,
         take: paginationOptions.take,

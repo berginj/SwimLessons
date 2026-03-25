@@ -399,7 +399,8 @@ export interface ITransitService {
     origin: Coordinates,
     destination: Coordinates,
     mode: TransitMode,
-    cityId: string
+    cityId: string,
+    departureTime?: string
   ): Promise<TransitEstimate | null>;
 
   /**
@@ -416,7 +417,8 @@ export interface ITransitService {
     origin: Coordinates,
     destinations: Array<{ id: string; coordinates: Coordinates }>,
     mode: TransitMode,
-    cityId: string
+    cityId: string,
+    departureTime?: string
   ): Promise<Map<string, TransitEstimate>>;
 }
 

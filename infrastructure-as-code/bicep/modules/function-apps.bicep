@@ -24,6 +24,12 @@ param keyVaultName string
 @description('Cosmos DB database ID')
 param cosmosDatabaseId string = 'swimlessons'
 
+@description('Optional external transit router GraphQL endpoint')
+param transitRouterGraphqlUrl string = ''
+
+@description('Transit router request timeout in milliseconds')
+param transitRouterTimeoutMs int = 2500
+
 // Storage account for Function App (required)
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   name: 'st${replace(functionAppName, '-', '')}' // Remove hyphens, max 24 chars
@@ -115,6 +121,14 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         {
           name: 'ENVIRONMENT'
           value: tags.environment
+        }
+        {
+          name: 'TRANSIT_ROUTER_GRAPHQL_URL'
+          value: transitRouterGraphqlUrl
+        }
+        {
+          name: 'TRANSIT_ROUTER_TIMEOUT_MS'
+          value: string(transitRouterTimeoutMs)
         }
       ]
     }

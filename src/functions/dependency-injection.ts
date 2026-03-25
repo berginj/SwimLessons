@@ -7,10 +7,11 @@
  * Factory pattern allows lazy initialization - services are created on first use.
  */
 
-import { ISearchService, ICityConfigService } from '@core/contracts/services';
+import { ISearchService, ICityConfigService, ITransitService } from '@core/contracts/services';
 import { ITenantRepository, ISessionRepository } from '@core/contracts/repositories';
 import { SearchService } from '@services/search/search-service';
 import { CityConfigService } from '@services/control-plane/city-config-service';
+import { TransitService } from '@services/transit/transit-service';
 import { CosmosDBClient, CosmosConfig, CONTAINERS, createCosmosClient } from '@infrastructure/cosmos/cosmos-client';
 import { TenantRepository } from '@infrastructure/cosmos/repositories/tenant-repository';
 import { SessionRepository } from '@infrastructure/cosmos/repositories/session-repository';
@@ -29,6 +30,7 @@ interface DependencyContainer {
 
   // Services
   cityConfigService: ICityConfigService;
+  transitService: ITransitService;
   searchService: ISearchService;
 }
 
@@ -73,6 +75,7 @@ async function initializeDependencies(): Promise<DependencyContainer> {
   // Initialize services
   console.log('[DI] Initializing services...');
   const cityConfigService = new CityConfigService(tenantRepository);
+  const transitService = new TransitService();
   const searchService = new SearchService(sessionRepository, cityConfigService);
 
   // Create container
@@ -81,6 +84,7 @@ async function initializeDependencies(): Promise<DependencyContainer> {
     tenantRepository,
     sessionRepository,
     cityConfigService,
+    transitService,
     searchService,
   };
 

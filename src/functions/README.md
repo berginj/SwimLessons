@@ -215,6 +215,8 @@ All endpoints track execution time and include it in the response metadata:
 - `APP_CONFIG_ENDPOINT`: Azure App Configuration endpoint
 - `KEY_VAULT_NAME`: Azure Key Vault name
 - `APPLICATIONINSIGHTS_CONNECTION_STRING`: (optional) Application Insights connection
+- `TRANSIT_ROUTER_GRAPHQL_URL`: (optional) OpenTripPlanner GraphQL endpoint for NYC schedule-based routing
+- `TRANSIT_ROUTER_TIMEOUT_MS`: (optional) timeout for transit router requests in milliseconds
 
 ## Development
 

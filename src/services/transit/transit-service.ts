@@ -18,11 +18,31 @@
 import { Coordinates, TransitMode } from '@core/contracts/city-config';
 import { TransitEstimate } from '@core/models/canonical-schema';
 import { ITransitService } from '@core/contracts/services';
+import { getEnvNumber, getEnvOptional } from '@core/utils/env';
+
+interface OtpPlanResponse {
+  data?: {
+    plan?: {
+      itineraries?: Array<{
+        duration?: number;
+        legs?: Array<{
+          mode?: string;
+        }>;
+      }>;
+    };
+  };
+  errors?: Array<{
+    message?: string;
+  }>;
+}
 
 /**
  * TransitService implementation with distance-based fallback
  */
 export class TransitService implements ITransitService {
+  private readonly transitRouterGraphqlUrl = getEnvOptional('TRANSIT_ROUTER_GRAPHQL_URL', '').trim();
+  private readonly transitRouterTimeoutMs = getEnvNumber('TRANSIT_ROUTER_TIMEOUT_MS', 2500);
+
   /**
    * Speed estimates by transit mode type (mph)
    */
@@ -49,25 +69,31 @@ export class TransitService implements ITransitService {
     origin: Coordinates,
     destination: Coordinates,
     mode: TransitMode,
-    cityId: string
+    cityId: string,
+    departureTime?: string
   ): Promise<TransitEstimate | null> {
     try {
-      // Calculate haversine distance
       const distanceMiles = this.calculateHaversineDistance(origin, destination);
 
-      // Get speed for transit mode
-      const speedMph = TransitService.SPEED_ESTIMATES[mode.mode] || 15;
+      if (cityId === 'nyc') {
+        const routedEstimate = await this.estimateNycTransitTimeFromRouter(
+          origin,
+          destination,
+          distanceMiles,
+          mode.mode,
+          departureTime
+        );
+        if (routedEstimate) {
+          return routedEstimate;
+        }
 
-      // Calculate time in minutes (distance / speed * 60)
+        return this.estimateNycTransitTimeFallback(distanceMiles, mode.mode, departureTime);
+      }
+
+      const speedMph = TransitService.SPEED_ESTIMATES[mode.mode] || 15;
       const timeMinutes = Math.round((distanceMiles / speedMph) * 60);
 
-      return {
-        durationMinutes: timeMinutes,
-        distance: Math.round(distanceMiles * 10) / 10, // Round to 1 decimal place
-        mode: mode.mode,
-        confidence: 'fallback', // Indicate this is distance-based estimate
-        calculatedAt: new Date().toISOString(),
-      };
+      return this.buildEstimate(distanceMiles, timeMinutes, mode.mode, 'fallback');
     } catch (error) {
       console.error(
         `Error estimating transit time from ${JSON.stringify(origin)} to ${JSON.stringify(
@@ -93,32 +119,260 @@ export class TransitService implements ITransitService {
     origin: Coordinates,
     destinations: Array<{ id: string; coordinates: Coordinates }>,
     mode: TransitMode,
-    cityId: string
+    cityId: string,
+    departureTime?: string
   ): Promise<Map<string, TransitEstimate>> {
     const estimates = new Map<string, TransitEstimate>();
 
     try {
-      // Get speed for transit mode
-      const speedMph = TransitService.SPEED_ESTIMATES[mode.mode] || 15;
-
-      // Calculate estimates for all destinations
       for (const dest of destinations) {
-        const distanceMiles = this.calculateHaversineDistance(origin, dest.coordinates);
-        const timeMinutes = Math.round((distanceMiles / speedMph) * 60);
-
-        estimates.set(dest.id, {
-          durationMinutes: timeMinutes,
-          distance: Math.round(distanceMiles * 10) / 10,
-          mode: mode.mode,
-          confidence: 'fallback',
-          calculatedAt: new Date().toISOString(),
-        });
+        const estimate = await this.estimateTransitTime(
+          origin,
+          dest.coordinates,
+          mode,
+          cityId,
+          departureTime
+        );
+        if (estimate) {
+          estimates.set(dest.id, estimate);
+        }
       }
     } catch (error) {
       console.error(`Error batch estimating transit times for city ${cityId}:`, error);
     }
 
     return estimates;
+  }
+
+  private async estimateNycTransitTimeFromRouter(
+    origin: Coordinates,
+    destination: Coordinates,
+    distanceMiles: number,
+    mode: string,
+    departureTime?: string
+  ): Promise<TransitEstimate | null> {
+    if (!this.transitRouterGraphqlUrl || (mode !== 'walking' && mode !== 'subway')) {
+      return null;
+    }
+
+    const variables =
+      mode === 'walking'
+        ? this.buildWalkingPlanVariables(origin, destination, departureTime)
+        : this.buildTransitPlanVariables(origin, destination, departureTime);
+
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort(), this.transitRouterTimeoutMs);
+
+    try {
+      const response = await fetch(this.transitRouterGraphqlUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: OTP_PLAN_QUERY,
+          variables,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        console.warn(
+          `Transit router request failed with status ${response.status} ${response.statusText}`
+        );
+        return null;
+      }
+
+      const payload = (await response.json()) as OtpPlanResponse;
+      if (payload.errors && payload.errors.length > 0) {
+        console.warn(
+          'Transit router returned GraphQL errors:',
+          payload.errors.map((error) => error.message).join('; ')
+        );
+        return null;
+      }
+
+      const itinerary = payload.data?.plan?.itineraries?.[0];
+      if (!itinerary) {
+        return null;
+      }
+
+      const rawDuration = itinerary.duration;
+      const durationMinutes = Number.isFinite(rawDuration)
+        ? Math.max(1, Math.round((rawDuration as number) / 60))
+        : null;
+
+      if (!durationMinutes) {
+        return null;
+      }
+
+      return {
+        durationMinutes,
+        distance: Math.round(distanceMiles * 10) / 10,
+        mode: this.derivePrimaryMode(mode, itinerary.legs),
+        confidence: 'estimated',
+        calculatedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      console.warn('Transit router request failed, falling back to heuristic estimate:', error);
+      return null;
+    } finally {
+      clearTimeout(timeoutHandle);
+    }
+  }
+
+  private estimateNycTransitTimeFallback(
+    distanceMiles: number,
+    mode: string,
+    departureTime?: string
+  ): TransitEstimate {
+    const profile = this.getNycTimeProfile(departureTime);
+
+    switch (mode) {
+      case 'walking':
+        return this.buildEstimate(
+          distanceMiles,
+          (distanceMiles / 3.1) * 60,
+          'walking',
+          'estimated'
+        );
+
+      case 'bus': {
+        const accessMinutes = Math.min(10, Math.max(3, distanceMiles * 2.2));
+        const egressMinutes = Math.min(8, Math.max(2, distanceMiles * 1.1));
+        const transferMinutes = distanceMiles > 4 ? 4 : 0;
+        const inVehicleMinutes = (distanceMiles / profile.busSpeedMph) * 60;
+        const totalMinutes =
+          accessMinutes +
+          profile.busWaitMinutes +
+          inVehicleMinutes +
+          transferMinutes +
+          egressMinutes;
+
+        return this.buildEstimate(distanceMiles, totalMinutes, 'bus', 'estimated');
+      }
+
+      case 'rail':
+      case 'subway': {
+        const accessMinutes = Math.min(14, Math.max(5, 4 + distanceMiles * 0.7));
+        const egressMinutes = Math.min(10, Math.max(4, 3 + distanceMiles * 0.5));
+        const transferMinutes = distanceMiles > 5 ? 5 : distanceMiles > 2.5 ? 3 : 0;
+        const inVehicleMinutes = (distanceMiles / profile.subwaySpeedMph) * 60;
+        const totalMinutes =
+          accessMinutes +
+          profile.subwayWaitMinutes +
+          inVehicleMinutes +
+          transferMinutes +
+          egressMinutes;
+
+        return this.buildEstimate(distanceMiles, totalMinutes, 'subway', 'estimated');
+      }
+
+      default: {
+        const speedMph = TransitService.SPEED_ESTIMATES[mode] || 15;
+        return this.buildEstimate(
+          distanceMiles,
+          (distanceMiles / speedMph) * 60,
+          mode,
+          'fallback'
+        );
+      }
+    }
+  }
+
+  private buildEstimate(
+    distanceMiles: number,
+    timeMinutes: number,
+    mode: string,
+    confidence: TransitEstimate['confidence']
+  ): TransitEstimate {
+    return {
+      durationMinutes: Math.max(1, Math.round(timeMinutes)),
+      distance: Math.round(distanceMiles * 10) / 10,
+      mode,
+      confidence,
+      calculatedAt: new Date().toISOString(),
+    };
+  }
+
+  private getNycTimeProfile(departureTime?: string): {
+    subwaySpeedMph: number;
+    subwayWaitMinutes: number;
+    busSpeedMph: number;
+    busWaitMinutes: number;
+  } {
+    const hour = this.extractHour(departureTime);
+    const dayOfWeek = this.extractDayOfWeek(departureTime);
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+    if (isWeekend) {
+      return {
+        subwaySpeedMph: 16,
+        subwayWaitMinutes: 7,
+        busSpeedMph: 7.5,
+        busWaitMinutes: 10,
+      };
+    }
+
+    if ((hour >= 7 && hour < 10) || (hour >= 16 && hour < 19)) {
+      return {
+        subwaySpeedMph: 16.5,
+        subwayWaitMinutes: 4.5,
+        busSpeedMph: 7.5,
+        busWaitMinutes: 6.5,
+      };
+    }
+
+    if (hour >= 22 || hour < 6) {
+      return {
+        subwaySpeedMph: 15,
+        subwayWaitMinutes: 8,
+        busSpeedMph: 7,
+        busWaitMinutes: 11,
+      };
+    }
+
+    if (hour >= 19) {
+      return {
+        subwaySpeedMph: 17,
+        subwayWaitMinutes: 6.5,
+        busSpeedMph: 8,
+        busWaitMinutes: 8,
+      };
+    }
+
+    return {
+      subwaySpeedMph: 18,
+      subwayWaitMinutes: 5.5,
+      busSpeedMph: 8.5,
+      busWaitMinutes: 7.5,
+    };
+  }
+
+  private extractHour(departureTime?: string): number {
+    if (!departureTime) {
+      return 12;
+    }
+
+    const timePartMatch = departureTime.match(/T(\d{2}):(\d{2})/);
+    if (!timePartMatch) {
+      return 12;
+    }
+
+    return Number.parseInt(timePartMatch[1] || '12', 10);
+  }
+
+  private extractDayOfWeek(departureTime?: string): number {
+    if (!departureTime) {
+      return 2;
+    }
+
+    const datePart = departureTime.slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+      return 2;
+    }
+
+    return new Date(`${datePart}T12:00:00Z`).getUTCDay();
   }
 
   /**
@@ -158,4 +412,125 @@ export class TransitService implements ITransitService {
 
     return distance;
   }
+
+  private buildWalkingPlanVariables(
+    origin: Coordinates,
+    destination: Coordinates,
+    departureTime?: string
+  ) {
+    const { date, time } = this.getOtpDateTime(departureTime);
+
+    return {
+      from: origin,
+      to: destination,
+      date,
+      time,
+      numItineraries: 1,
+      walkReluctance: 1,
+      transportModes: [
+        {
+          mode: 'WALK',
+        },
+      ],
+    };
+  }
+
+  private buildTransitPlanVariables(
+    origin: Coordinates,
+    destination: Coordinates,
+    departureTime?: string
+  ) {
+    const { date, time } = this.getOtpDateTime(departureTime);
+
+    return {
+      from: origin,
+      to: destination,
+      date,
+      time,
+      numItineraries: 1,
+      walkReluctance: 2.2,
+      transportModes: [
+        {
+          mode: 'WALK',
+        },
+        {
+          mode: 'TRANSIT',
+        },
+      ],
+    };
+  }
+
+  private getOtpDateTime(departureTime?: string): { date: string; time: string } {
+    if (!departureTime) {
+      return {
+        date: '2026-06-15',
+        time: '17:00',
+      };
+    }
+
+    const [date = '2026-06-15', rawTime = '17:00:00'] = departureTime.split('T');
+    const normalizedTime = rawTime.slice(0, 5);
+
+    return {
+      date,
+      time: normalizedTime || '17:00',
+    };
+  }
+
+  private derivePrimaryMode(
+    requestedMode: string,
+    legs: Array<{ mode?: string }> | undefined
+  ): string {
+    if (!legs || legs.length === 0) {
+      return requestedMode === 'subway' ? 'subway' : requestedMode;
+    }
+
+    const transitModes = legs
+      .map((leg) => (leg.mode || '').toUpperCase())
+      .filter((mode) => mode && mode !== 'WALK');
+
+    if (transitModes.includes('SUBWAY')) {
+      return 'subway';
+    }
+    if (transitModes.includes('RAIL')) {
+      return 'rail';
+    }
+    if (transitModes.includes('BUS')) {
+      return 'bus';
+    }
+    if (transitModes.length === 0) {
+      return 'walking';
+    }
+
+    return transitModes[0]?.toLowerCase() || requestedMode;
+  }
 }
+
+const OTP_PLAN_QUERY = `
+  query Plan(
+    $from: InputCoordinates!
+    $to: InputCoordinates!
+    $date: String!
+    $time: String!
+    $transportModes: [TransportModeInput!]!
+    $numItineraries: Int!
+    $walkReluctance: Float
+  ) {
+    plan(
+      from: $from
+      to: $to
+      date: $date
+      time: $time
+      transportModes: $transportModes
+      numItineraries: $numItineraries
+      walkReluctance: $walkReluctance
+    ) {
+      itineraries {
+        duration
+        legs {
+          mode
+        }
+      }
+    }
+  }
+`;

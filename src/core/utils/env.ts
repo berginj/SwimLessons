@@ -54,6 +54,8 @@ export interface EnvironmentConfig {
   appConfigEndpoint: string;
   keyVaultName: string;
   applicationInsightsConnectionString?: string;
+  transitRouterGraphqlUrl?: string;
+  transitRouterTimeoutMs: number;
 }
 
 /**
@@ -73,6 +75,8 @@ export function loadEnvironmentConfig(): EnvironmentConfig {
     appConfigEndpoint: getEnvRequired('APP_CONFIG_ENDPOINT'),
     keyVaultName: getEnvRequired('KEY_VAULT_NAME'),
     applicationInsightsConnectionString: getEnvOptional('APPLICATIONINSIGHTS_CONNECTION_STRING', ''),
+    transitRouterGraphqlUrl: getEnvOptional('TRANSIT_ROUTER_GRAPHQL_URL', ''),
+    transitRouterTimeoutMs: getEnvNumber('TRANSIT_ROUTER_TIMEOUT_MS', 2500),
   };
 }
 
