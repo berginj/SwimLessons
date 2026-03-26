@@ -12,7 +12,7 @@ This platform uses **contract-driven development** to enable your 2-4 person tea
 
 Current-reality note:
 - the live frontend is plain `src/web` HTML/CSS/JS, not React
-- the active operator surface is the protected `GET /api/operator/cities/{cityId}/stats` endpoint plus the CLI/runbook
+- the active operator surface is the protected `GET /api/operator/cities/{cityId}/stats` endpoint plus the CLI/runbook and local HTML dashboard generator
 - staging is already a seeded NYC MVP environment, not a planning-only shell
 - the older staffing and onboarding examples below are still useful reference material, but they are not the active workboard
 
@@ -86,6 +86,7 @@ Parent-facing endpoints:
 Operator-facing surface:
 - `GET /api/operator/cities/{cityId}/stats`
 - `npm run operator:city-stats -- --environment staging --city nyc`
+- `npm run operator:city-dashboard -- --environment staging --city nyc --output tmp/operator-dashboard.html`
 
 Operational baseline:
 - staging is deterministic and seeded with NYC session data

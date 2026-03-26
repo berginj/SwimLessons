@@ -18,6 +18,11 @@ The script:
 - calls the stats endpoint directly on the Function App
 - prints either a readable summary or the raw JSON payload
 
+There is also a local HTML dashboard generator on top of the same protected endpoint:
+- Repo script: `scripts/operator-city-dashboard.mjs`
+- NPM entrypoint: `npm run operator:city-dashboard -- ...`
+- Output: a local HTML report that does not expose the Function key in the public web app
+
 ## Prerequisites
 
 - Azure CLI installed
@@ -58,6 +63,16 @@ npm run operator:city-stats -- `
   --city nyc
 ```
 
+### Generate a local dashboard report
+
+```powershell
+npm run operator:city-dashboard -- `
+  --environment staging `
+  --city nyc `
+  --output tmp/operator-dashboard-nyc.html `
+  --open
+```
+
 ## How To Read The Output
 
 - `Supply`: current provider/location/session counts and active session count
@@ -73,6 +88,7 @@ Rates are decimal ratios returned by the API and shown by the script as percenta
 ## Operational Notes
 
 - This script is the safe way to consume the protected stats endpoint.
+- The dashboard script is also safe because it resolves the Function key locally and writes a local HTML report.
 - Do not build a public browser dashboard that embeds the Function key.
 - For staging, the default resource group is `swim-lessons-staging-rg`.
 - For production, pass explicit overrides until the production environment is actively in use.
@@ -82,4 +98,6 @@ Rates are decimal ratios returned by the API and shown by the script as percenta
 - `src/functions/admin-api/city-stats.ts`
 - `src/functions/admin-api/city-stats-helpers.ts`
 - `src/core/contracts/api-contracts.ts`
+- `scripts/operator-city-dashboard.mjs`
+- `scripts/operator-city-stats-lib.mjs`
 - `docs/architecture/ORCHESTRATION-TRACKER.md`

@@ -131,6 +131,7 @@ Do not regress the app back toward:
 ### Operator Workflow
 
 - Operator stats script: `scripts/operator-city-stats.mjs`
+- Operator dashboard script: `scripts/operator-city-dashboard.mjs`
 - Operator stats runbook: `docs/operations/OPERATOR-STATS-RUNBOOK.md`
 
 ### Transit
@@ -250,6 +251,7 @@ Run when touching staging seed, smoke behavior, or live deployment wiring:
 
 Run when touching telemetry aggregation or operator-facing query surfaces:
 - `npm run operator:city-stats -- --environment staging --city nyc`
+- `npm run operator:city-dashboard -- --environment staging --city nyc --output tmp/operator-dashboard.html`
 
 ### Transit Operational Checks
 

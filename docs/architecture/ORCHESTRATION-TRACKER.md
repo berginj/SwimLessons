@@ -42,10 +42,11 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Staging `POST /api/events`: now part of the required smoke path
 - Operator telemetry query surface: `GET /api/operator/cities/{cityId}/stats` is implemented as a Function-key-protected endpoint
 - Operator stats runbook: `npm run operator:city-stats -- --environment staging --city nyc` resolves the Function key and calls the protected city stats endpoint directly
+- Operator dashboard report: `npm run operator:city-dashboard -- --environment staging --city nyc --output tmp/operator-dashboard.html` generates a local HTML report from the same protected endpoint without exposing the Function key in the web app
 - Browser-provided origin override: shipped on `main`; Times Square remains the fallback when permission is denied or unavailable
 - Browser-origin regression coverage: Playwright covers granted-location propagation, denial fallback, reset-to-Times-Square behavior, and telemetry payload shape
 - Router-backed transit assertion: now part of the staging smoke contract and workflow path, with router settings restored from the live staging container before smoke
-- Current user-visible blocker: none critical in staging; the next quality gaps are keeping browser-origin coverage aligned with UI changes and deciding whether the operator runbook needs a richer dashboard
+- Current user-visible blocker: none critical in staging; the next quality gaps are keeping browser-origin coverage aligned with UI changes and deciding whether operators eventually need a hosted dashboard beyond the local runbook and report
 
 ---
 
@@ -91,7 +92,7 @@ Note:
   - Function App app settings for transit router
 
 Current gaps:
-- the operator runbook exists, but there is still no first-class dashboard surface if operators eventually need a richer UI
+- the operator runbook now includes a local HTML dashboard report, but there is still no hosted operator UI if product learning eventually needs a shared dashboard
 - the remaining architecture summary docs still need periodic spot-checks so they do not drift back toward planning-era assumptions
 
 ---
@@ -102,7 +103,7 @@ Current gaps:
 |-----------|-------------|----------------|--------------|-------------------|------------------|----------------|----------------|
 | Keep deterministic NYC seed + smoke path stable | Data/Platform Agent | Maintain repo-owned seed and smoke behavior across staging deploys | None | product/story, repository, staging smoke path, deployment | parent, operator | Not blocked | Yes |
 | Extend browser-origin regression coverage as UI evolves | Frontend/QA Agent | Keep granted, denied, and reset browser-origin paths covered as the search UI changes | None | workflow, product/story, API, browser test harness | parent | Not blocked | Yes |
-| Build operator dashboard on top of city stats | Full-stack Agent | Turn the protected city stats query surface into a richer operator-facing surface if the CLI/runbook stops being enough | protected city stats endpoint, operator runbook | API, telemetry service, operator workflows | operator | Not blocked | Yes |
+| Evaluate hosted operator dashboard need | Full-stack/Product Agent | Decide whether the new local dashboard report is sufficient or whether operators need a shared hosted dashboard | protected city stats endpoint, operator runbook, local dashboard report | API, telemetry service, operator workflows | operator | Not blocked | Yes |
 
 ---
 
@@ -115,7 +116,7 @@ Scoring formula:
 |----------------|------|--------------------|--------------------|----------------------|------------|--------------------------|
 | 360 | Keep deterministic NYC seed + smoke path stable | The seeded data and smoke path are now required deployment behavior | Preserves a working parent journey | Protects staging honesty and repeatability | Medium | Ongoing |
 | 345 | Keep browser-origin regression coverage current | The current flow is covered, but UI changes can easily break origin behavior again | Keeps the parent-facing geolocation flow trustworthy | Builds directly on the shipped Playwright harness | Medium | Ongoing |
-| 300 | Decide whether the operator stats runbook needs a richer dashboard | The protected stats endpoint now has a supported CLI/runbook path | Improves operational learning if the CLI becomes insufficient | Follows the new operator runbook | Medium | Follow-up |
+| 260 | Decide whether the local operator dashboard should become a hosted shared surface | Operators now have both a CLI/runbook and a richer local HTML report | Improves operational learning if a shared view becomes necessary | Follows the new operator tooling baseline | Medium | Follow-up |
 
 ---
 
@@ -147,6 +148,7 @@ Scoring formula:
 - Parent/caregiver persona is now formalized in `docs/architecture/PARENT-PERSONA.md`
 - The operator telemetry follow-up now has a query surface instead of only raw event ingestion
 - The operator telemetry query surface now also has a repo-owned CLI/runbook consumer
+- The operator telemetry query surface now also has a repo-owned local HTML dashboard generator
 - `integration-flows.md`, `CONTRACT-SUMMARY.md`, and `README.md` were trimmed to stop presenting deferred onboarding/data-sync flows as live NYC MVP truth
 
 ### Workflow/Code Areas Requiring Re-Review
@@ -163,10 +165,10 @@ Scoring formula:
 
 ## F. Next Recommended Tasks
 
-1. Decide whether the operator stats runbook needs a richer dashboard
-   - Why next: operators now have a working CLI/runbook, so the next question is whether they need a richer surface or whether the runbook is sufficient
-   - Unblocks: a more explicit operator workflow if product learning needs grow
-   - Risk reduced: telemetry remaining available but underused
+1. Decide whether the local operator dashboard should become a hosted shared surface
+   - Why next: operators now have both a working CLI/runbook and a local HTML dashboard, so the next question is whether a shared hosted view is actually needed
+   - Unblocks: a more explicit operator workflow only if product learning or collaboration pressure grows
+   - Risk reduced: overbuilding operator UX before there is a real need
 
 2. Keep browser-origin regression coverage aligned with future UI changes
    - Why next: the denial/reset path is now covered and should stay covered
