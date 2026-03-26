@@ -72,151 +72,249 @@ const sessionDetails = {
   },
 };
 
-test.describe('browser location transit regression', () => {
-  test.use({
-    permissions: ['geolocation'],
-    geolocation: browserOrigin,
+async function registerApiMocks(page, capturedSearchBodies, capturedSessionDetailOrigins, capturedTelemetryRequests) {
+  await page.route('**/api/cities?includePreview=true', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          cities: [
+            {
+              cityId: 'nyc',
+              displayName: 'New York City',
+              status: 'active',
+              availableSessionCount: 10,
+              defaultCenter: { latitude: 40.758, longitude: -73.9855 },
+            },
+          ],
+        },
+      }),
+    });
   });
 
-  test('uses browser geolocation for search and session details', async ({ page }) => {
+  await page.route('**/api/search', async (route) => {
+    const requestBody = route.request().postDataJSON();
+    capturedSearchBodies.push(requestBody);
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          results: searchResults,
+          pagination: {
+            skip: 0,
+            take: 20,
+            total: searchResults.length,
+            hasMore: false,
+          },
+        },
+      }),
+    });
+  });
+
+  await page.route('**/api/sessions/*', async (route) => {
+    const requestUrl = new URL(route.request().url());
+    const origin = requestUrl.searchParams.get('origin');
+    if (origin) {
+      capturedSessionDetailOrigins.push(origin);
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: sessionDetails,
+      }),
+    });
+  });
+
+  await page.route('**/api/events', async (route) => {
+    const requestBody = route.request().postDataJSON();
+    capturedTelemetryRequests.push(requestBody);
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          accepted: Array.isArray(requestBody?.events) ? requestBody.events.length : 0,
+          rejected: 0,
+        },
+      }),
+    });
+  });
+}
+
+function getTelemetryEvents(capturedTelemetryRequests) {
+  return capturedTelemetryRequests.flatMap((request) =>
+    Array.isArray(request?.events) ? request.events : []
+  );
+}
+
+test.describe('browser location transit regression', () => {
+  test.describe('granted location', () => {
+    test.use({
+      permissions: ['geolocation'],
+      geolocation: browserOrigin,
+    });
+
+    test('uses browser geolocation for search and session details', async ({ page }) => {
+      const capturedSearchBodies: any[] = [];
+      const capturedSessionDetailOrigins: string[] = [];
+      const capturedTelemetryRequests: any[] = [];
+
+      await registerApiMocks(
+        page,
+        capturedSearchBodies,
+        capturedSessionDetailOrigins,
+        capturedTelemetryRequests
+      );
+
+      await page.goto('/');
+
+      await expect(page.getByText(/Using Times Square as the travel-time starting point/i)).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Use browser location' })).toBeVisible();
+
+      await page.getByRole('button', { name: 'Use browser location' }).click();
+
+      await expect(
+        page.getByText(/Using your current location for travel times/i)
+      ).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Use Times Square instead' })).toBeVisible();
+
+      await expect
+        .poll(() => capturedSearchBodies.length)
+        .toBeGreaterThan(1);
+
+      const latestSearchBody = capturedSearchBodies.at(-1);
+      expect(latestSearchBody?.userContext?.origin).toEqual(browserOrigin);
+
+      await page.getByRole('button', { name: 'View details' }).click();
+
+      await expect(
+        page.getByText('Approx. 17 min by subway from your current location for about 4.1 miles.')
+      ).toBeVisible();
+
+      await expect
+        .poll(() => getTelemetryEvents(capturedTelemetryRequests).length)
+        .toBeGreaterThan(0);
+
+      const telemetryEvents = getTelemetryEvents(capturedTelemetryRequests);
+
+      const geolocationGrantedEvent = telemetryEvents.find(
+        (event) => event.eventName === 'GeolocationGranted'
+      );
+      expect(geolocationGrantedEvent).toMatchObject({
+        cityId: 'nyc',
+        platform: 'web',
+        properties: {},
+      });
+
+      const latestSearchStartedEvent = [...telemetryEvents]
+        .reverse()
+        .find((event) => event.eventName === 'SearchStarted');
+      expect(latestSearchStartedEvent?.properties?.hasLocation).toBe(true);
+      expect(latestSearchStartedEvent?.properties?.filters?.origin).toEqual(browserOrigin);
+
+      await expect
+        .poll(() => capturedSessionDetailOrigins.length)
+        .toBeGreaterThan(0);
+
+      const latestOrigin = JSON.parse(capturedSessionDetailOrigins.at(-1) || '{}');
+      expect(latestOrigin).toEqual(browserOrigin);
+
+      await page.getByRole('button', { name: 'Close' }).click();
+
+      const searchCountBeforeReset = capturedSearchBodies.length;
+      await page.getByRole('button', { name: 'Use Times Square instead' }).click();
+
+      await expect(page.getByText(/Using Times Square as the travel-time starting point/i)).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Use Times Square instead' })).toBeHidden();
+
+      await expect
+        .poll(() => capturedSearchBodies.length)
+        .toBeGreaterThan(searchCountBeforeReset);
+
+      const resetSearchBody = capturedSearchBodies.at(-1);
+      expect(resetSearchBody?.userContext).toBeUndefined();
+
+      const latestResetSearchStartedEvent = [...getTelemetryEvents(capturedTelemetryRequests)]
+        .reverse()
+        .find((event) => event.eventName === 'SearchStarted');
+      expect(latestResetSearchStartedEvent?.properties?.hasLocation).toBe(false);
+      expect(latestResetSearchStartedEvent?.properties?.filters?.origin).toBeUndefined();
+      expect(latestResetSearchStartedEvent?.properties?.filters?.originSource).toBe('default');
+    });
+  });
+
+  test('keeps Times Square fallback when browser location is denied', async ({ page }) => {
     const capturedSearchBodies: any[] = [];
     const capturedSessionDetailOrigins: string[] = [];
     const capturedTelemetryRequests: any[] = [];
 
-    await page.route('**/api/cities?includePreview=true', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: {
-            cities: [
-              {
-                cityId: 'nyc',
-                displayName: 'New York City',
-                status: 'active',
-                availableSessionCount: 10,
-                defaultCenter: { latitude: 40.758, longitude: -73.9855 },
-              },
-            ],
+    await registerApiMocks(
+      page,
+      capturedSearchBodies,
+      capturedSessionDetailOrigins,
+      capturedTelemetryRequests
+    );
+
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'geolocation', {
+        configurable: true,
+        value: {
+          getCurrentPosition: (_success, error) => {
+            error({
+              code: 1,
+              message: 'Permission denied',
+            });
           },
-        }),
-      });
-    });
-
-    await page.route('**/api/search', async (route) => {
-      const requestBody = route.request().postDataJSON();
-      capturedSearchBodies.push(requestBody);
-
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: {
-            results: searchResults,
-            pagination: {
-              skip: 0,
-              take: 20,
-              total: searchResults.length,
-              hasMore: false,
-            },
-          },
-        }),
-      });
-    });
-
-    await page.route('**/api/sessions/*', async (route) => {
-      const requestUrl = new URL(route.request().url());
-      const origin = requestUrl.searchParams.get('origin');
-      if (origin) {
-        capturedSessionDetailOrigins.push(origin);
-      }
-
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: sessionDetails,
-        }),
-      });
-    });
-
-    await page.route('**/api/events', async (route) => {
-      const requestBody = route.request().postDataJSON();
-      capturedTelemetryRequests.push(requestBody);
-
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: {
-            accepted: Array.isArray(requestBody?.events) ? requestBody.events.length : 0,
-            rejected: 0,
-          },
-        }),
+          watchPosition: () => 0,
+          clearWatch: () => {},
+        },
       });
     });
 
     await page.goto('/');
 
     await expect(page.getByText(/Using Times Square as the travel-time starting point/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Use browser location' })).toBeVisible();
+    expect(capturedSearchBodies).toHaveLength(1);
+    expect(capturedSearchBodies[0]?.userContext).toBeUndefined();
 
     await page.getByRole('button', { name: 'Use browser location' }).click();
 
     await expect(
-      page.getByText(/Using your current location for travel times/i)
+      page.getByText(/Location permission was denied, so travel times are using Times Square/i)
     ).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Use Times Square instead' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Use Times Square instead' })).toBeHidden();
+    expect(capturedSearchBodies).toHaveLength(1);
+    expect(capturedSessionDetailOrigins).toHaveLength(0);
 
     await expect
-      .poll(() => capturedSearchBodies.length)
-      .toBeGreaterThan(1);
-
-    const latestSearchBody = capturedSearchBodies.at(-1);
-    expect(latestSearchBody?.userContext?.origin).toEqual(browserOrigin);
-
-    await page.getByRole('button', { name: 'View details' }).click();
-
-    await expect(
-      page.getByText('Approx. 17 min by subway from your current location for about 4.1 miles.')
-    ).toBeVisible();
-
-    await expect
-      .poll(() =>
-        capturedTelemetryRequests.flatMap((request) =>
-          Array.isArray(request?.events) ? request.events : []
-        ).length
-      )
+      .poll(() => getTelemetryEvents(capturedTelemetryRequests).length)
       .toBeGreaterThan(0);
 
-    const telemetryEvents = capturedTelemetryRequests.flatMap((request) =>
-      Array.isArray(request?.events) ? request.events : []
-    );
-
-    const geolocationGrantedEvent = telemetryEvents.find(
-      (event) => event.eventName === 'GeolocationGranted'
-    );
-    expect(geolocationGrantedEvent).toMatchObject({
+    const telemetryEvents = getTelemetryEvents(capturedTelemetryRequests);
+    const deniedEvent = telemetryEvents.find((event) => event.eventName === 'GeolocationDenied');
+    expect(deniedEvent).toMatchObject({
       cityId: 'nyc',
       platform: 'web',
-      properties: {},
+      properties: {
+        browserReason: 'permission_denied',
+      },
     });
 
     const latestSearchStartedEvent = [...telemetryEvents]
       .reverse()
       .find((event) => event.eventName === 'SearchStarted');
-    expect(latestSearchStartedEvent?.properties?.hasLocation).toBe(true);
-    expect(latestSearchStartedEvent?.properties?.filters?.origin).toEqual(browserOrigin);
-
-    await expect
-      .poll(() => capturedSessionDetailOrigins.length)
-      .toBeGreaterThan(0);
-
-    const latestOrigin = JSON.parse(capturedSessionDetailOrigins.at(-1) || '{}');
-    expect(latestOrigin).toEqual(browserOrigin);
+    expect(latestSearchStartedEvent?.properties?.hasLocation).toBe(false);
+    expect(latestSearchStartedEvent?.properties?.filters?.origin).toBeUndefined();
+    expect(latestSearchStartedEvent?.properties?.filters?.originSource).toBe('default');
   });
 });
