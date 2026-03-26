@@ -61,12 +61,12 @@ As of 2026-03-26, the repo is not in “foundation only” mode anymore. The liv
   - `GET /api/sessions/{id}`
   - `POST /api/events`
 - protected operator Function endpoint currently in use is:
-  - `GET /api/admin/cities/{cityId}/stats`
+  - `GET /api/operator/cities/{cityId}/stats`
 - staging uses a deterministic NYC dataset and must keep non-zero search results
 - browser geolocation is opt-in and falls back to Times Square when denied or unavailable
 - transit estimates use an external OTP-style GraphQL router when configured and a deterministic fallback otherwise
 - top-10 search results receive transit enrichment; session details also compute travel time
-- `/api/events` is the ingestion path and `/api/admin/cities/{cityId}/stats` is the first read-only operator query surface
+- `/api/events` is the ingestion path and `/api/operator/cities/{cityId}/stats` is the first read-only operator query surface
 
 Do not regress the app back toward:
 - empty NYC staging data
@@ -127,6 +127,11 @@ Do not regress the app back toward:
 - Staging seed runner: `scripts/seed-staging-nyc.mjs`
 - Staging smoke: `scripts/run-staging-smoke.mjs`
 - Session data guide: `SESSION-DATA-GUIDE.md`
+
+### Operator Workflow
+
+- Operator stats script: `scripts/operator-city-stats.mjs`
+- Operator stats runbook: `docs/operations/OPERATOR-STATS-RUNBOOK.md`
 
 ### Transit
 
@@ -240,6 +245,11 @@ Run when touching `src/web`, browser geolocation behavior, request propagation, 
 Run when touching staging seed, smoke behavior, or live deployment wiring:
 - `npm run seed:staging:nyc`
 - `npm run smoke:staging -- https://ambitious-mud-07c32a410.1.azurestaticapps.net`
+
+### Operator Checks
+
+Run when touching telemetry aggregation or operator-facing query surfaces:
+- `npm run operator:city-stats -- --environment staging --city nyc`
 
 ### Transit Operational Checks
 

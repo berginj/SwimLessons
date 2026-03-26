@@ -40,7 +40,8 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Staging `POST /api/search`: `success`, `total: 10`
 - Staging `GET /api/sessions/{id}?cityId=nyc`: `success` for `nyc-session-40425724-5`
 - Staging `POST /api/events`: now part of the required smoke path
-- Operator telemetry query surface: `GET /api/admin/cities/{cityId}/stats` is implemented as a Function-key-protected endpoint
+- Operator telemetry query surface: `GET /api/operator/cities/{cityId}/stats` is implemented as a Function-key-protected endpoint
+- Operator stats runbook: `npm run operator:city-stats -- --environment staging --city nyc` resolves the Function key and calls the protected city stats endpoint directly
 - Browser-provided origin override: shipped on `main`; Times Square remains the fallback when permission is denied or unavailable
 - Browser-origin regression coverage: Playwright covers granted-location propagation, denial fallback, reset-to-Times-Square behavior, and telemetry payload shape
 - Router-backed transit assertion: now part of the staging smoke contract and workflow path, with router settings restored from the live staging container before smoke
@@ -91,7 +92,7 @@ Note:
 
 Current gaps:
 - `docs/architecture/integration-flows.md` still contains lower-confidence future-state sections outside the current NYC MVP
-- the operator query surface exists, but there is still no first-class dashboard or runbook consumer on top of it
+- the operator runbook exists, but there is still no first-class dashboard surface if operators eventually need a richer UI
 
 ---
 
@@ -101,7 +102,7 @@ Current gaps:
 |-----------|-------------|----------------|--------------|-------------------|------------------|----------------|----------------|
 | Keep deterministic NYC seed + smoke path stable | Data/Platform Agent | Maintain repo-owned seed and smoke behavior across staging deploys | None | product/story, repository, staging smoke path, deployment | parent, operator | Not blocked | Yes |
 | Extend browser-origin regression coverage as UI evolves | Frontend/QA Agent | Keep granted, denied, and reset browser-origin paths covered as the search UI changes | None | workflow, product/story, API, browser test harness | parent | Not blocked | Yes |
-| Build operator dashboard/runbook on top of city stats | Full-stack/Docs Agent | Turn the protected city stats query surface into a repeatable operator workflow | protected city stats endpoint | API, telemetry service, operator workflows, docs | operator | Not blocked | Yes |
+| Build operator dashboard on top of city stats | Full-stack Agent | Turn the protected city stats query surface into a richer operator-facing surface if the CLI/runbook stops being enough | protected city stats endpoint, operator runbook | API, telemetry service, operator workflows | operator | Not blocked | Yes |
 | Trim lower-confidence future-state workflow docs | Docs/Architecture Agent | Reconcile older architecture narratives to the now-explicit persona and current NYC MVP | parent persona doc | persona, workflow, docs | parent, operator | Not blocked | Yes |
 
 ---
@@ -115,7 +116,7 @@ Scoring formula:
 |----------------|------|--------------------|--------------------|----------------------|------------|--------------------------|
 | 360 | Keep deterministic NYC seed + smoke path stable | The seeded data and smoke path are now required deployment behavior | Preserves a working parent journey | Protects staging honesty and repeatability | Medium | Ongoing |
 | 345 | Keep browser-origin regression coverage current | The current flow is covered, but UI changes can easily break origin behavior again | Keeps the parent-facing geolocation flow trustworthy | Builds directly on the shipped Playwright harness | Medium | Ongoing |
-| 315 | Build operator dashboard/runbook on top of city stats | The telemetry query surface now exists, but operators still need a routine way to use it | Improves operational learning | Follows the new protected stats endpoint | Medium | Follow-up |
+| 300 | Decide whether the operator stats runbook needs a richer dashboard | The protected stats endpoint now has a supported CLI/runbook path | Improves operational learning if the CLI becomes insufficient | Follows the new operator runbook | Medium | Follow-up |
 | 290 | Trim lower-confidence future-state workflow docs | Some older architecture docs still overstate future or generic behavior | Keeps agents aligned to the real NYC MVP | Follows the new persona contract | Medium | Follow-up |
 
 ---
@@ -132,7 +133,7 @@ Scoring formula:
 - NYC default transit origin is the city default center, currently Times Square, with optional browser override in the web app
 - `POST /api/events` is now part of the active Function surface and staging smoke path
 - Frontend telemetry events use a contract-compliant `properties` envelope, with backend compatibility for older flat payloads
-- `GET /api/admin/cities/{cityId}/stats` is the first operator-facing read-only telemetry summary surface and uses Function auth
+- `GET /api/operator/cities/{cityId}/stats` is the first operator-facing read-only telemetry summary surface and uses Function auth
 
 ### Open Persona Change Requests
 
@@ -147,6 +148,7 @@ Scoring formula:
 - Keep staging smoke checks bound to the live transit router, not fallback-only behavior
 - Parent/caregiver persona is now formalized in `docs/architecture/PARENT-PERSONA.md`
 - The operator telemetry follow-up now has a query surface instead of only raw event ingestion
+- The operator telemetry query surface now also has a repo-owned CLI/runbook consumer
 
 ### Workflow/Code Areas Requiring Re-Review
 
@@ -167,11 +169,10 @@ Scoring formula:
    - Unblocks: cleaner agent pickup and less workflow drift
    - Risk reduced: stale documentation pulling implementation in the wrong direction
 
-2. Build operator dashboard/runbook on top of city stats
-   - Why next: the query surface exists, but operators still need a routine way to use it
-   - Unblocks: repeatable product learning from search, geolocation, and signup telemetry
-   - Risk reduced: telemetry data exists but remains operationally dark
-
+2. Trim lower-confidence future-state workflow docs
+   - Why next: the persona and deployment contracts are stronger than some older architecture narratives
+   - Unblocks: cleaner agent pickup and less stale workflow guidance
+   - Risk reduced: old docs pulling implementation away from the current NYC MVP
 3. Keep browser-origin regression coverage aligned with future UI changes
    - Why next: the denial/reset path is now covered and should stay covered
    - Unblocks: safer UI iteration on search and location controls

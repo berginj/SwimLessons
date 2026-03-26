@@ -7,7 +7,7 @@ This directory contains all Azure Function HTTP endpoints for the swim lessons d
 ```
 src/functions/
 ├── admin-api/
-│   └── city-stats.ts       # Operator stats endpoint (GET /api/admin/cities/{cityId}/stats)
+│   └── city-stats.ts       # Operator stats endpoint (GET /api/operator/cities/{cityId}/stats)
 ├── search-api/
 │   ├── search.ts           # Main search endpoint (POST /api/search)
 │   ├── session-details.ts  # Session details endpoint (GET /api/sessions/:sessionId)
@@ -218,7 +218,7 @@ Notes:
 - It also tolerates older flat event payloads and folds unknown top-level fields into `properties`.
 - The endpoint is anonymous and designed to fail soft from the browser's point of view.
 
-### GET /api/admin/cities/{cityId}/stats
+### GET /api/operator/cities/{cityId}/stats
 Read-only operator stats endpoint for the NYC MVP.
 
 **Auth:**
@@ -231,7 +231,7 @@ Read-only operator stats endpoint for the NYC MVP.
 
 **Example:**
 ```
-GET /api/admin/cities/nyc/stats?startDate=2026-03-01T00:00:00.000Z&endDate=2026-03-26T23:59:59.999Z
+GET /api/operator/cities/nyc/stats?startDate=2026-03-01T00:00:00.000Z&endDate=2026-03-26T23:59:59.999Z
 ```
 
 **Response (200 OK):**
@@ -353,7 +353,8 @@ context.log(`[${requestId}] Search completed successfully. Results: ${response.r
 
 ## Security
 
-- All endpoints use `authLevel: 'anonymous'` (unauthenticated)
-- Production deployment should add authentication/authorization middleware
+- Parent-facing endpoints (`/api/cities`, `/api/search`, `/api/sessions/{id}`, `/api/events`) are anonymous
+- Operator stats uses `authLevel: 'function'`
+- Do not expose the operator Function key in the web app; use the operator runbook in `docs/operations/OPERATOR-STATS-RUNBOOK.md`
 - No sensitive data logged
 - Stack traces only shown in development environment

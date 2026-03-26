@@ -394,7 +394,7 @@ export interface TriggerSyncResponse {
 }
 
 /**
- * GET /admin/cities/:cityId/stats
+ * GET /operator/cities/:cityId/stats
  * Get city statistics for dashboard
  */
 export interface CityStatsRequest {

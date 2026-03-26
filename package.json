@@ -11,6 +11,7 @@
     "deploy:transit:staging": "node scripts/deploy-staging-transit-router.mjs",
     "seed:nyc": "tsx scripts/load-sessions.ts data/sessions-template.csv",
     "seed:staging:nyc": "node scripts/seed-staging-nyc.mjs",
+    "operator:city-stats": "node scripts/operator-city-stats.mjs",
     "smoke:transit:staging": "node scripts/smoke-transit-router.mjs",
     "smoke:staging": "node scripts/run-staging-smoke.mjs",
     "validate:deployment-contract": "node scripts/validate-deployment-contract.mjs",

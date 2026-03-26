@@ -1,5 +1,5 @@
 /**
- * City Stats API Endpoint - GET /api/admin/cities/{cityId}/stats
+ * City Stats API Endpoint - GET /api/operator/cities/{cityId}/stats
  *
  * Read-only operator surface for telemetry-backed city health and funnel metrics.
  * This is intentionally protected with Function auth instead of being anonymous.
@@ -153,9 +153,9 @@ function parseOptionalIsoDate(value: string | null): Date | null {
   return Number.isNaN(parsed.getTime()) ? new Date(Number.NaN) : parsed;
 }
 
-app.http('admin-city-stats', {
+app.http('operator-city-stats', {
   methods: ['GET'],
   authLevel: 'function',
-  route: 'admin/cities/{cityId}/stats',
+  route: 'operator/cities/{cityId}/stats',
   handler: cityStats,
 });
