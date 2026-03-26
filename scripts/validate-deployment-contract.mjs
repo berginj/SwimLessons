@@ -75,6 +75,12 @@ async function validateCiWorkflow() {
     'use_oidc: true',
     '.github/workflows/ci-build.yml must use OIDC for Codecov uploads'
   );
+
+  assertContains(
+    workflow,
+    "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'",
+    '.github/workflows/ci-build.yml must opt JavaScript actions into Node 24'
+  );
 }
 
 async function validateWorkflow(env) {
@@ -90,6 +96,12 @@ async function validateWorkflow(env) {
     workflow,
     'uses: actions/setup-node@v5',
     `${env.workflowPath} must use actions/setup-node@v5 where Node is configured`
+  );
+
+  assertContains(
+    workflow,
+    "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'",
+    `${env.workflowPath} must opt JavaScript actions into Node 24`
   );
 
   assertContains(

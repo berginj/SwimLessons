@@ -40,6 +40,9 @@ Bicep outputs may include identifiers, hostnames, and resource names.
 Bicep outputs must not include connection strings, access keys, or deployment tokens.
 Secrets must be fetched directly from Azure control-plane commands when needed.
 
+8. GitHub JavaScript actions must run on Node 24.
+Workflows in this repo must set `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` to avoid the GitHub-hosted Node 20 deprecation path.
+
 ## Environment Contract
 
 For NYC transit routing behavior, see [TRANSIT-ROUTER-CONTRACT.md](./TRANSIT-ROUTER-CONTRACT.md).

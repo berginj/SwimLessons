@@ -13,6 +13,7 @@ env:
   RESOURCE_GROUP: swim-lessons-staging-rg
   RESOURCE_GROUP_LOCATION: eastus
   PARAMETERS_FILE: infrastructure-as-code/bicep/parameters/staging.parameters.json
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   deploy-infrastructure:
