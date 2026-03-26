@@ -39,6 +39,7 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Staging `POST /api/search`: `success`, `total: 10`
 - Staging `GET /api/sessions/{id}?cityId=nyc`: `success` for `nyc-session-40425724-5`
 - Browser-provided origin override: shipped on `main`; Times Square remains the fallback when permission is denied or unavailable
+- Browser-origin regression coverage: added with Playwright for search + session-details origin propagation
 - Current user-visible blocker: staging is usable and deterministic, but telemetry is still not wired end to end and transit UI still needs broader regression coverage
 
 ---
@@ -101,7 +102,7 @@ Current gaps:
 | Add transit smoke and integration coverage | QA/Backend Agent | Cover top-10 enrichment, session-details travel time, fallback path, and keep staging smoke aligned with the seeded NYC path | seeded dataset; router for live-path assertions | workflow, technical, deployment | parent, operator | Partially blocked | No |
 | Reconcile workflow/docs to current transit behavior | Docs Agent | Update architecture docs to match Times Square fallback, browser override, top-10 enrichment, and router fallback | None | workflow, deployment, technical | parent, operator | Not blocked | Yes |
 | Close telemetry loop | Full-stack Agent | Implement `/api/events` and wire frontend telemetry end to end | None | API, telemetry service | operator | Not blocked | Yes |
-| Harden browser-provided origin flow | Frontend Agent | Keep browser geolocation opt-in, fallback-safe, and clearly explained in the UI | seeded data preferred | workflow, product/story, API | parent | In progress | Yes |
+| Extend browser-origin regression coverage | Frontend/QA Agent | Cover denial/fallback and router-backed rendering beyond the happy path | seeded data preferred | workflow, product/story, API, browser test harness | parent | Not blocked | Yes |
 
 ---
 
@@ -117,7 +118,7 @@ Scoring formula:
 | 410 | Reconcile workflow and deployment docs | Current docs underdescribe actual system behavior | Keeps future agents aligned | Prevents follow-on work from targeting stale assumptions | High | Run in parallel |
 | 395 | Add transit smoke/integration coverage | Transit behavior can regress silently | Preserves parent trust | Seeded data now exists; live router assertions still depend on router | High | Start now, extend after router |
 | 280 | Close telemetry loop | Search and transit behavior are not measurable end to end | Improves operator visibility | Not on critical path for parent MVP | Medium | Follow-up |
-| 360 | Harden browser-provided origin flow | The parent can now move beyond Times Square, but the UX needs regression protection | Makes routing personal instead of generic | Depends on the shipped frontend path staying aligned with search/session details | Medium | Land now, then cover with regression tests |
+| 330 | Extend browser-origin regression coverage | The happy path is covered, but denial/fallback and multi-result behavior still need browser checks | Keeps the parent-facing geolocation flow trustworthy | Builds on the shipped Playwright harness | Medium | Follow-up |
 
 ---
 
