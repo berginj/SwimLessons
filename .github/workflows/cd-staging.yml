@@ -256,7 +256,7 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --settings \
               "TRANSIT_ROUTER_GRAPHQL_URL=$TRANSIT_ROUTER_GRAPHQL_URL" \
-              "TRANSIT_ROUTER_TIMEOUT_MS=8000" \
+              "TRANSIT_ROUTER_TIMEOUT_MS=20000" \
             --output none
 
           echo "TRANSIT_ROUTER_GRAPHQL_URL=$TRANSIT_ROUTER_GRAPHQL_URL" >> "$GITHUB_ENV"

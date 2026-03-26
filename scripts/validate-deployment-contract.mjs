@@ -211,6 +211,12 @@ async function validateWorkflow(env) {
 
     assertContains(
       workflow,
+      'TRANSIT_ROUTER_TIMEOUT_MS=20000',
+      `${env.workflowPath} must restore the staging transit router timeout to the 20000ms contract baseline before smoke`
+    );
+
+    assertContains(
+      workflow,
       'npm run smoke:transit:staging -- "$TRANSIT_ROUTER_GRAPHQL_URL"',
       `${env.workflowPath} must smoke test the live transit router before end-to-end API smoke`
     );
