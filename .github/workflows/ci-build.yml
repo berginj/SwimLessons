@@ -47,7 +47,7 @@ jobs:
         run: npm test
 
       - name: Upload test coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v5.5.3
         if: always()
         env:
           FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'

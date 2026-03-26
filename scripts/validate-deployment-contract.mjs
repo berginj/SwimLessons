@@ -66,8 +66,8 @@ async function validateCiWorkflow() {
 
   assertContains(
     workflow,
-    'uses: codecov/codecov-action@v5',
-    '.github/workflows/ci-build.yml must use codecov/codecov-action@v5'
+    'uses: codecov/codecov-action@v5.5.3',
+    '.github/workflows/ci-build.yml must use codecov/codecov-action@v5.5.3'
   );
 
   assertContains(
@@ -84,7 +84,7 @@ async function validateCiWorkflow() {
 
   assertContains(
     workflow,
-    "- name: Upload test coverage\n        uses: codecov/codecov-action@v5\n        if: always()\n        env:\n          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'",
+    "- name: Upload test coverage\n        uses: codecov/codecov-action@v5.5.3\n        if: always()\n        env:\n          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'",
     '.github/workflows/ci-build.yml must force the Codecov step onto Node 24'
   );
 }
