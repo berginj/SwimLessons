@@ -1,7 +1,7 @@
 # Orchestration Tracker
 
 **Purpose:** Canonical pullable handoff for agents working on the NYC MVP
-**Last Updated:** 2026-03-25
+**Last Updated:** 2026-03-26
 **Status:** Active
 
 ---
@@ -28,16 +28,17 @@ Do not treat older root-level status docs as the active source of truth unless t
 
 - Branch baseline: `main`
 - Latest transit feature commit: `8682e9c` `feat: add nyc transit routing estimates`
+- Transit-router contract: `docs/architecture/TRANSIT-ROUTER-CONTRACT.md`
 - Latest build/deploy repair commits:
   - `4aa46b5` `fix: restore build and stabilize staging deploys`
   - `9ddb0a8` `fix: make nyc session seeding self-contained`
-- Latest verified CI run: `23571652395` `CI Build` `success`
-- Latest verified staging deploy: `23571652390` `Deploy to Staging` `success`
+- Latest verified CI run: `23573498609` `CI Build` `success`
+- Latest verified staging deploy: `23573498649` `Deploy to Staging` `success`
 - Staging site: `https://ambitious-mud-07c32a410.1.azurestaticapps.net/`
 - Staging `/api/cities`: `success`, NYC present, `availableSessionCount: 10`
 - Staging `POST /api/search`: `success`, `total: 10`
 - Staging `GET /api/sessions/{id}?cityId=nyc`: `success` for `nyc-session-40425724-5`
-- Current user-visible blocker: staging is now usable, but transit remains heuristic/fallback-based; the repo now codifies deterministic staging seed + smoke behavior and needs the next staging run to prove it
+- Current user-visible blocker: staging is usable and deterministic, but transit remains heuristic/fallback-based until the external NYC router is deployed and wired
 
 ---
 
@@ -67,6 +68,7 @@ Note:
 - Workflow contracts touched:
   - search journey in `docs/architecture/integration-flows.md`
   - staging deploy and smoke path in `docs/architecture/DEPLOYMENT-CONTRACT.md`
+  - NYC transit provider boundary in `docs/architecture/TRANSIT-ROUTER-CONTRACT.md`
 - Product/story contracts touched:
   - NYC is the deterministic first path
   - default transit origin is Times Square until parent location input exists
@@ -77,13 +79,14 @@ Note:
   - `src/core/utils/env.ts`
 - Deployment/operational contracts touched:
   - `docs/architecture/DEPLOYMENT-CONTRACT.md`
+  - `docs/architecture/TRANSIT-ROUTER-CONTRACT.md`
   - GitHub Actions staging workflow
   - Function App app settings for transit router
 
 Current gaps:
 - `docs/architecture/integration-flows.md` is stale relative to current transit behavior
-- deployment contract does not yet document the external transit-router dependency
-- deterministic NYC seed and end-to-end smoke steps must remain enforced in the staging workflow
+- the transit-router service is still not deployed in staging
+- transit regression coverage still does not prove router-backed behavior
 
 ---
 
@@ -92,8 +95,8 @@ Current gaps:
 | Task Name | Owner Agent | PR-Sized Scope | Dependencies | Contracts Touched | Personas Touched | Blocker Status | Parallelizable |
 |-----------|-------------|----------------|--------------|-------------------|------------------|----------------|----------------|
 | Operationalize deterministic NYC dataset | Data/Platform Agent | Keep the seed path repo-owned, workflow-driven, and idempotent across staging deploys | None | product/story, repository, staging smoke path, deployment | parent, operator | Not blocked | Yes |
-| Define transit-router operational contract | Platform Agent | Document OTP endpoint shape, hosting, timeout, graph build cadence, feed inputs, and required env vars | None | technical, deployment | parent, operator | Not blocked | Yes |
-| Deploy schedule-based NYC transit router | Platform Agent | Provision router service and set `TRANSIT_ROUTER_GRAPHQL_URL` for staging | transit-router operational contract | deployment, env, transit service | parent, operator | Blocked by missing router service | No |
+| Define transit-router operational contract | Platform Agent | Document OTP endpoint shape, hosting, timeout, graph build cadence, feed inputs, and required env vars | None | technical, deployment | parent, operator | Done | Yes |
+| Deploy schedule-based NYC transit router | Platform Agent | Provision router service and set `TRANSIT_ROUTER_GRAPHQL_URL` for staging | transit-router operational contract | deployment, env, transit service | parent, operator | Not blocked | No |
 | Add transit smoke and integration coverage | QA/Backend Agent | Cover top-10 enrichment, session-details travel time, fallback path, and keep staging smoke aligned with the seeded NYC path | seeded dataset; router for live-path assertions | workflow, technical, deployment | parent, operator | Partially blocked | No |
 | Reconcile workflow/docs to current transit behavior | Docs Agent | Update architecture docs to match Times Square default origin, top-10 enrichment, and router fallback | None | workflow, deployment, technical | parent, operator | Not blocked | Yes |
 | Close telemetry loop | Full-stack Agent | Implement `/api/events` and wire frontend telemetry end to end | None | API, telemetry service | operator | Not blocked | Yes |
@@ -109,7 +112,7 @@ Scoring formula:
 | Priority Score | Item | Why It Matters Now | User/Persona Value | Dependency Rationale | Drift Risk | Execution Recommendation |
 |----------------|------|--------------------|--------------------|----------------------|------------|--------------------------|
 | 455 | Operationalize deterministic NYC seed + smoke path | The data is live now, but it must stay reproducible on every staging deploy | Preserves a working parent journey instead of a one-off seed | Protects smoke coverage and keeps staging honest | High | Do now |
-| 445 | Define and deploy schedule-based OTP router | Current transit path is still heuristic fallback in live environments | Improves trust in travel times | Required before live router-backed estimates exist | High | Start contract now, then deploy |
+| 445 | Deploy schedule-based OTP router | Current transit path is still heuristic fallback in live environments | Improves trust in travel times | Transit contract now exists; deploy is the next hard dependency | High | Do next |
 | 410 | Reconcile workflow and deployment docs | Current docs underdescribe actual system behavior | Keeps future agents aligned | Prevents follow-on work from targeting stale assumptions | High | Run in parallel |
 | 395 | Add transit smoke/integration coverage | Transit behavior can regress silently | Preserves parent trust | Seeded data now exists; live router assertions still depend on router | High | Start now, extend after router |
 | 280 | Close telemetry loop | Search and transit behavior are not measurable end to end | Improves operator visibility | Not on critical path for parent MVP | Medium | Follow-up |
@@ -136,6 +139,7 @@ Scoring formula:
 
 - Formalize a dedicated persona artifact for the parent/caregiver
 - Add a transit-router operational contract and runbook
+- Transit-router contract now exists in `docs/architecture/TRANSIT-ROUTER-CONTRACT.md`
 - Keep the NYC staging seed path repo-owned and workflow-enforced
 - Keep staging smoke checks bound to real NYC search/session behavior
 
@@ -157,8 +161,8 @@ Scoring formula:
    - Unblocks: trustworthy smoke coverage and repeatable agent handoffs
    - Risk reduced: a green deploy with zero parent-visible results
 
-2. Define and deploy the NYC transit-router contract and staging endpoint
-   - Why next: transit code is shipped, but live routing is still fallback-based
+2. Deploy the NYC transit-router staging endpoint
+   - Why next: the transit-router contract is now defined, and transit code is shipped but still fallback-based
    - Unblocks: real schedule-based transit estimates and router-backed smoke tests
    - Risk reduced: backend/platform drift around router assumptions
 

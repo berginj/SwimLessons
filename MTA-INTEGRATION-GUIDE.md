@@ -1,5 +1,11 @@
 # 🚇 MTA Integration Guide - Real Transit Time Routing
 
+> Status: historical planning note, not the current source of truth.
+>
+> The active contract for NYC transit routing is now
+> [docs/architecture/TRANSIT-ROUTER-CONTRACT.md](./docs/architecture/TRANSIT-ROUTER-CONTRACT.md).
+> For the current MVP, other agents should follow the OTP-style external transit-router contract rather than this earlier Google Maps recommendation.
+
 ## 📊 **Current State Analysis**
 
 **What's Already Built:**

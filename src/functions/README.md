@@ -218,6 +218,8 @@ All endpoints track execution time and include it in the response metadata:
 - `TRANSIT_ROUTER_GRAPHQL_URL`: (optional) OpenTripPlanner GraphQL endpoint for NYC schedule-based routing
 - `TRANSIT_ROUTER_TIMEOUT_MS`: (optional) timeout for transit router requests in milliseconds
 
+Transit routing ownership, provider precedence, fallback rules, and staging expectations are defined in [TRANSIT-ROUTER-CONTRACT.md](../../docs/architecture/TRANSIT-ROUTER-CONTRACT.md).
+
 ## Development
 
 ### Local Testing

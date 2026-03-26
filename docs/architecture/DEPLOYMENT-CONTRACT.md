@@ -42,12 +42,17 @@ Secrets must be fetched directly from Azure control-plane commands when needed.
 
 ## Environment Contract
 
+For NYC transit routing behavior, see [TRANSIT-ROUTER-CONTRACT.md](./TRANSIT-ROUTER-CONTRACT.md).
+
 ### Staging
 
 - Resource group: `swim-lessons-staging-rg`
 - Resource group location: `eastus`
 - Parameter file: `infrastructure-as-code/bicep/parameters/staging.parameters.json`
 - Workload location from parameter file: `centralus`
+- Transit router app settings:
+  - `TRANSIT_ROUTER_GRAPHQL_URL` optional until router service is deployed
+  - `TRANSIT_ROUTER_TIMEOUT_MS` defaults to `2500`
 
 ### Production
 
@@ -55,6 +60,9 @@ Secrets must be fetched directly from Azure control-plane commands when needed.
 - Resource group location: `eastus`
 - Parameter file: `infrastructure-as-code/bicep/parameters/production.parameters.json`
 - Workload location from parameter file: `eastus`
+- Transit router app settings:
+  - `TRANSIT_ROUTER_GRAPHQL_URL` optional until router service is deployed
+  - `TRANSIT_ROUTER_TIMEOUT_MS` defaults to `2500`
 
 ## Required Deployment Sequence
 

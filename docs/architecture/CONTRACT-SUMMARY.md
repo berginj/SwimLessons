@@ -42,6 +42,14 @@ Deployment behavior is also contract-driven now.
 - CI enforces the deployment contract with `npm run validate:deployment-contract`.
 - Changes to GitHub workflows, Bicep deployment ownership, or SWA backend linking must satisfy that contract before merge.
 
+## 🚇 Transit Router Contract
+
+NYC transit behavior is now explicitly contract-driven too.
+
+- [TRANSIT-ROUTER-CONTRACT.md](./TRANSIT-ROUTER-CONTRACT.md) defines the schedule-based transit routing boundary for NYC.
+- The current MVP contract targets an external OpenTripPlanner-style GraphQL endpoint set through `TRANSIT_ROUTER_GRAPHQL_URL`.
+- Router-backed behavior currently applies to NYC walking and subway-oriented routing, with explicit fallback rules when the router is unavailable.
+
 ## 🧭 Active Work Tracking
 
 Use [ORCHESTRATION-TRACKER.md](./ORCHESTRATION-TRACKER.md) as the canonical pickup document for:

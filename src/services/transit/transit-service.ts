@@ -37,6 +37,11 @@ interface OtpPlanResponse {
   }>;
 }
 
+interface OtpInputCoordinates {
+  lat: number;
+  lon: number;
+}
+
 /**
  * TransitService implementation with distance-based fallback
  */
@@ -482,8 +487,8 @@ export class TransitService implements ITransitService {
     const { date, time } = this.getOtpDateTime(departureTime);
 
     return {
-      from: origin,
-      to: destination,
+      from: this.toOtpCoordinates(origin),
+      to: this.toOtpCoordinates(destination),
       date,
       time,
       numItineraries: 1,
@@ -504,8 +509,8 @@ export class TransitService implements ITransitService {
     const { date, time } = this.getOtpDateTime(departureTime);
 
     return {
-      from: origin,
-      to: destination,
+      from: this.toOtpCoordinates(origin),
+      to: this.toOtpCoordinates(destination),
       date,
       time,
       numItineraries: 1,
@@ -535,6 +540,13 @@ export class TransitService implements ITransitService {
     return {
       date,
       time: normalizedTime || '17:00',
+    };
+  }
+
+  private toOtpCoordinates(coordinates: Coordinates): OtpInputCoordinates {
+    return {
+      lat: coordinates.latitude,
+      lon: coordinates.longitude,
     };
   }
 
