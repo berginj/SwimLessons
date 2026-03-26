@@ -31,8 +31,8 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Branch baseline: `main`
 - Repo agent guidance: `AGENTS.md`
 - Transit-router contract: `docs/architecture/TRANSIT-ROUTER-CONTRACT.md`
-- Latest verified CI run: `23614221377` `CI Build` `success`
-- Latest verified staging deploy: `23614221376` `Deploy to Staging` `success`
+- Latest verified CI run: `23615563877` `CI Build` `success`
+- Latest verified staging deploy: `23615083121` `Deploy to Staging` `success`
 - Staging site: `https://ambitious-mud-07c32a410.1.azurestaticapps.net/`
 - Staging `/api/cities`: `success`, NYC present, `availableSessionCount: 10`
 - Staging `POST /api/search`: `success`, `total: 10`
@@ -40,7 +40,8 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Staging `POST /api/events`: now part of the required smoke path
 - Browser-provided origin override: shipped on `main`; Times Square remains the fallback when permission is denied or unavailable
 - Browser-origin regression coverage: Playwright covers granted-location propagation, denial fallback, reset-to-Times-Square behavior, and telemetry payload shape
-- Current user-visible blocker: none critical in staging; the next quality gaps are router-backed transit assertions and a formalized parent persona artifact
+- Router-backed transit assertion: now part of the staging smoke contract and workflow path, with router settings restored from the live staging container before smoke
+- Current user-visible blocker: none critical in staging; the next quality gaps are a formalized parent persona artifact and operator-facing telemetry/query surfaces
 
 ---
 
@@ -87,7 +88,6 @@ Note:
 
 Current gaps:
 - `docs/architecture/integration-flows.md` still contains lower-confidence future-state sections outside the current NYC MVP
-- transit regression coverage still does not explicitly prove live router-backed behavior distinct from fallback behavior
 - telemetry ingestion is now wired, but dashboards/query paths are still operator follow-up work
 
 ---
@@ -97,7 +97,6 @@ Current gaps:
 | Task Name | Owner Agent | PR-Sized Scope | Dependencies | Contracts Touched | Personas Touched | Blocker Status | Parallelizable |
 |-----------|-------------|----------------|--------------|-------------------|------------------|----------------|----------------|
 | Keep deterministic NYC seed + smoke path stable | Data/Platform Agent | Maintain repo-owned seed and smoke behavior across staging deploys | None | product/story, repository, staging smoke path, deployment | parent, operator | Not blocked | Yes |
-| Add router-backed transit assertions | QA/Backend Agent | Prove live router-backed travel time in smoke or integration coverage without relying only on fallback estimates | seeded dataset; live router | workflow, technical, deployment | parent, operator | Not blocked | No |
 | Extend browser-origin regression coverage as UI evolves | Frontend/QA Agent | Keep granted, denied, and reset browser-origin paths covered as the search UI changes | None | workflow, product/story, API, browser test harness | parent | Not blocked | Yes |
 | Formalize parent persona artifact | Product/Docs Agent | Capture the implicit NYC parent persona and parent trust requirements in one dedicated doc | None | persona, workflow | parent | Not blocked | Yes |
 | Build operator telemetry follow-up surfaces | Full-stack Agent | Add dashboards/query paths for the now-live `/api/events` ingestion path | telemetry ingestion baseline | API, telemetry service, operator workflows | operator | Not blocked | Yes |
@@ -111,9 +110,8 @@ Scoring formula:
 
 | Priority Score | Item | Why It Matters Now | User/Persona Value | Dependency Rationale | Drift Risk | Execution Recommendation |
 |----------------|------|--------------------|--------------------|----------------------|------------|--------------------------|
-| 405 | Add router-backed transit assertions | Transit can still regress silently toward fallback-only behavior | Preserves parent trust in travel times | Depends on the live router that staging already has | High | Do next |
-| 345 | Keep browser-origin regression coverage current | The current flow is covered, but UI changes can easily break origin behavior again | Keeps the parent-facing geolocation flow trustworthy | Builds directly on the shipped Playwright harness | Medium | Ongoing |
 | 360 | Keep deterministic NYC seed + smoke path stable | The seeded data and smoke path are now required deployment behavior | Preserves a working parent journey | Protects staging honesty and repeatability | Medium | Ongoing |
+| 345 | Keep browser-origin regression coverage current | The current flow is covered, but UI changes can easily break origin behavior again | Keeps the parent-facing geolocation flow trustworthy | Builds directly on the shipped Playwright harness | Medium | Ongoing |
 | 315 | Build operator telemetry follow-up surfaces | `/api/events` now ingests data, but operators still lack first-class visibility | Improves operational learning | Follows the newly completed telemetry path | Medium | Follow-up |
 | 280 | Formalize parent persona artifact | The parent persona still lives only in thread decisions and code behavior | Reduces future requirement drift | No hard blocker, but important for alignment | Medium | Follow-up |
 
@@ -143,6 +141,7 @@ Scoring formula:
 - Transit-router contract now exists in `docs/architecture/TRANSIT-ROUTER-CONTRACT.md`
 - Keep the NYC staging seed path repo-owned and workflow-enforced
 - Keep staging smoke checks bound to real NYC search/session behavior
+- Keep staging smoke checks bound to the live transit router, not fallback-only behavior
 
 ### Workflow/Code Areas Requiring Re-Review
 
@@ -158,15 +157,15 @@ Scoring formula:
 
 ## F. Next Recommended Tasks
 
-1. Add router-backed transit assertions to smoke or integration coverage
-   - Why next: staging now has a live router and the contract says router-backed behavior matters
-   - Unblocks: stronger proof that transit is not quietly falling back
-   - Risk reduced: router drift masked by deterministic fallback
-
-2. Formalize the parent persona artifact
+1. Formalize the parent persona artifact
    - Why next: the repo now has stronger technical contracts than persona documentation
    - Unblocks: cleaner requirement reviews and future agent alignment
    - Risk reduced: hidden persona drift
+
+2. Build operator telemetry follow-up surfaces
+   - Why next: `/api/events` is live, but operators still cannot inspect parent behavior without ad hoc queries
+   - Unblocks: practical learning from search, geolocation, and session-interest events
+   - Risk reduced: silent product friction without observability
 
 3. Keep browser-origin regression coverage aligned with future UI changes
    - Why next: the denial/reset path is now covered and should stay covered

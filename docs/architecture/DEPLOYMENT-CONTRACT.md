@@ -54,7 +54,7 @@ For NYC transit routing behavior, see [TRANSIT-ROUTER-CONTRACT.md](./TRANSIT-ROU
 - Parameter file: `infrastructure-as-code/bicep/parameters/staging.parameters.json`
 - Workload location from parameter file: `centralus`
 - Transit router app settings:
-  - `TRANSIT_ROUTER_GRAPHQL_URL` optional until router service is deployed
+  - `TRANSIT_ROUTER_GRAPHQL_URL` required and restored from the live staging router before smoke
   - `TRANSIT_ROUTER_TIMEOUT_MS` defaults to `2500`
 
 ### Production
@@ -76,7 +76,9 @@ For NYC transit routing behavior, see [TRANSIT-ROUTER-CONTRACT.md](./TRANSIT-ROU
 5. Deploy the Functions package.
 6. Deploy the Static Web App content.
 7. For staging, seed the deterministic NYC session dataset before smoke tests.
-8. Smoke test `/`, `/api/cities`, `POST /api/search`, `GET /api/sessions/{id}`, and `POST /api/events` on staging.
+8. For staging, restore `TRANSIT_ROUTER_GRAPHQL_URL` onto the live Function App from the running transit router.
+9. Smoke test the live transit router with `routes` and `planConnection`.
+10. Smoke test `/`, `/api/cities`, `POST /api/search`, `GET /api/sessions/{id}`, and `POST /api/events` on staging, including a router-backed transit assertion.
 
 If any of those steps are skipped, the deployment is incomplete.
 
@@ -89,6 +91,8 @@ If any of those steps are skipped, the deployment is incomplete.
   - NYC `availableSessionCount > 0`
   - `POST /api/search` returns at least one result
   - `GET /api/sessions/{id}?cityId=nyc` succeeds for a returned session
+  - the live transit router returns both `routes` and `planConnection`
+  - the API travel time for a subway result stays within tolerance of the live router result
   - `POST /api/events` accepts a valid browser telemetry payload
 
 ## Forbidden Changes

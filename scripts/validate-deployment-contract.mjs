@@ -38,6 +38,7 @@ async function main() {
   await validateMainBicep();
   await validateDeployScript();
   await validateStagingSmokeScript();
+  await validateTransitRouterSmokeScript();
 
   if (errors.length > 0) {
     console.error('Deployment contract validation failed:');
@@ -182,6 +183,36 @@ async function validateWorkflow(env) {
       workflow,
       'npm run seed:staging:nyc',
       `${env.workflowPath} must run npm run seed:staging:nyc`
+    );
+
+    assertContains(
+      workflow,
+      '- name: Azure Login',
+      `${env.workflowPath} smoke path must log into Azure before resolving transit router settings`
+    );
+
+    assertContains(
+      workflow,
+      'az container show',
+      `${env.workflowPath} must resolve the live staging transit router container group before smoke`
+    );
+
+    assertContains(
+      workflow,
+      'az functionapp config appsettings set',
+      `${env.workflowPath} must restore TRANSIT_ROUTER_GRAPHQL_URL onto the staging Function App before smoke`
+    );
+
+    assertContains(
+      workflow,
+      'TRANSIT_ROUTER_GRAPHQL_URL=$TRANSIT_ROUTER_GRAPHQL_URL',
+      `${env.workflowPath} must export TRANSIT_ROUTER_GRAPHQL_URL into the smoke environment`
+    );
+
+    assertContains(
+      workflow,
+      'npm run smoke:transit:staging -- "$TRANSIT_ROUTER_GRAPHQL_URL"',
+      `${env.workflowPath} must smoke test the live transit router before end-to-end API smoke`
     );
 
     assertContains(
@@ -357,8 +388,42 @@ async function validateStagingSmokeScript() {
 
   assertContains(
     smokeScript,
+    'TRANSIT_ROUTER_GRAPHQL_URL',
+    'run-staging-smoke.mjs must accept TRANSIT_ROUTER_GRAPHQL_URL for router-backed assertions'
+  );
+
+  assertContains(
+    smokeScript,
+    'router-backed transit assertion',
+    'run-staging-smoke.mjs must verify router-backed transit behavior when the router URL is configured'
+  );
+
+  assertContains(
+    smokeScript,
     '/api/events',
     'run-staging-smoke.mjs must verify /api/events'
+  );
+}
+
+async function validateTransitRouterSmokeScript() {
+  const smokeScript = await readRepoText('scripts/smoke-transit-router.mjs');
+
+  assertContains(
+    smokeScript,
+    'routes {',
+    'smoke-transit-router.mjs must verify the router routes query'
+  );
+
+  assertContains(
+    smokeScript,
+    'planConnection(',
+    'smoke-transit-router.mjs must verify the router planConnection query'
+  );
+
+  assertContains(
+    smokeScript,
+    'Times Square',
+    'smoke-transit-router.mjs must use Times Square as the deterministic origin smoke check'
   );
 }
 

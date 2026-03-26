@@ -217,6 +217,8 @@ This contract is satisfied when:
 - `TRANSIT_ROUTER_GRAPHQL_URL` is set in staging
 - NYC walking/subway requests use the router when available
 - the transit smoke path proves both `routes` and `planConnection` are working against the live router
+- staging deployment restores `TRANSIT_ROUTER_GRAPHQL_URL` onto the live Function App from the running router before smoke
+- staging end-to-end smoke proves a returned subway trip stays within tolerance of the live router duration
 - search and session-details still succeed when the router fails
 - smoke or regression coverage proves both router-backed and fallback behavior
 
