@@ -25,7 +25,7 @@ param tags object = {
 param transitRouterGraphqlUrl string = ''
 
 @description('Transit router request timeout in milliseconds')
-param transitRouterTimeoutMs int = 2500
+param transitRouterTimeoutMs int = 20000
 
 // === Cosmos DB (Serverless Mode) ===
 module cosmosDb 'modules/cosmos-db.bicep' = {

@@ -28,7 +28,7 @@ param cosmosDatabaseId string = 'swimlessons'
 param transitRouterGraphqlUrl string = ''
 
 @description('Transit router request timeout in milliseconds')
-param transitRouterTimeoutMs int = 2500
+param transitRouterTimeoutMs int = 20000
 
 // Storage account for Function App (required)
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {

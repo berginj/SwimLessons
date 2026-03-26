@@ -44,7 +44,7 @@ interface OtpPlanResponse {
  */
 export class TransitService implements ITransitService {
   private readonly transitRouterGraphqlUrl = getEnvOptional('TRANSIT_ROUTER_GRAPHQL_URL', '').trim();
-  private readonly transitRouterTimeoutMs = getEnvNumber('TRANSIT_ROUTER_TIMEOUT_MS', 2500);
+  private readonly transitRouterTimeoutMs = getEnvNumber('TRANSIT_ROUTER_TIMEOUT_MS', 20000);
   private readonly googleMapsService: GoogleMapsTransitService | null;
 
   constructor() {

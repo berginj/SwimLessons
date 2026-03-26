@@ -76,7 +76,7 @@ export function loadEnvironmentConfig(): EnvironmentConfig {
     keyVaultName: getEnvRequired('KEY_VAULT_NAME'),
     applicationInsightsConnectionString: getEnvOptional('APPLICATIONINSIGHTS_CONNECTION_STRING', ''),
     transitRouterGraphqlUrl: getEnvOptional('TRANSIT_ROUTER_GRAPHQL_URL', ''),
-    transitRouterTimeoutMs: getEnvNumber('TRANSIT_ROUTER_TIMEOUT_MS', 2500),
+    transitRouterTimeoutMs: getEnvNumber('TRANSIT_ROUTER_TIMEOUT_MS', 20000),
   };
 }
 

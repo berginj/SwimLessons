@@ -170,7 +170,7 @@ Function App settings:
   - empty string disables router-backed NYC routing
   - non-empty value must be a full GraphQL endpoint URL reachable from Azure Functions
 - `TRANSIT_ROUTER_TIMEOUT_MS`
-  - default: `2500`
+  - default: `20000`
   - applies per router request
 
 Staging baseline:

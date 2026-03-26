@@ -55,7 +55,7 @@ For NYC transit routing behavior, see [TRANSIT-ROUTER-CONTRACT.md](./TRANSIT-ROU
 - Workload location from parameter file: `centralus`
 - Transit router app settings:
   - `TRANSIT_ROUTER_GRAPHQL_URL` required and restored from the live staging router before smoke
-  - `TRANSIT_ROUTER_TIMEOUT_MS` defaults to `2500`
+  - `TRANSIT_ROUTER_TIMEOUT_MS` defaults to `20000`
 
 ### Production
 
@@ -65,7 +65,7 @@ For NYC transit routing behavior, see [TRANSIT-ROUTER-CONTRACT.md](./TRANSIT-ROU
 - Workload location from parameter file: `eastus`
 - Transit router app settings:
   - `TRANSIT_ROUTER_GRAPHQL_URL` optional until router service is deployed
-  - `TRANSIT_ROUTER_TIMEOUT_MS` defaults to `2500`
+  - `TRANSIT_ROUTER_TIMEOUT_MS` defaults to `20000`
 
 ## Required Deployment Sequence
 

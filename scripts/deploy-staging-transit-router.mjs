@@ -519,7 +519,7 @@ function setFunctionAppTransitRouter(routerGraphqlUrl) {
     functionAppName,
     '--settings',
     `TRANSIT_ROUTER_GRAPHQL_URL=${routerGraphqlUrl}`,
-    'TRANSIT_ROUTER_TIMEOUT_MS=8000',
+    'TRANSIT_ROUTER_TIMEOUT_MS=20000',
   ]);
 }
 
