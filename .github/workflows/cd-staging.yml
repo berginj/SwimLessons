@@ -20,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       functionAppName: ${{ steps.deploy.outputs.functionAppName }}
+      cosmosDbAccountName: ${{ steps.deploy.outputs.cosmosDbAccountName }}
       staticWebAppName: ${{ steps.deploy.outputs.staticWebAppName }}
       staticWebAppUrl: ${{ steps.deploy.outputs.staticWebAppUrl }}
 
@@ -64,10 +65,12 @@ jobs:
 
           # Extract outputs
           FUNCTION_APP_NAME=$(jq -r '.properties.outputs.functionAppName.value' deployment-output.json)
+          COSMOS_DB_ACCOUNT_NAME=$(jq -r '.properties.outputs.cosmosDbAccountName.value' deployment-output.json)
           STATIC_WEB_APP_NAME=$(jq -r '.properties.outputs.staticWebAppName.value' deployment-output.json)
           STATIC_WEB_APP_URL=$(jq -r '.properties.outputs.staticWebAppUrl.value' deployment-output.json)
 
           echo "functionAppName=$FUNCTION_APP_NAME" >> $GITHUB_OUTPUT
+          echo "cosmosDbAccountName=$COSMOS_DB_ACCOUNT_NAME" >> $GITHUB_OUTPUT
           echo "staticWebAppName=$STATIC_WEB_APP_NAME" >> $GITHUB_OUTPUT
           echo "staticWebAppUrl=$STATIC_WEB_APP_URL" >> $GITHUB_OUTPUT
 
@@ -178,10 +181,43 @@ jobs:
           echo "✅ Static Web App deployed to staging"
           echo "URL: ${{ needs.deploy-infrastructure.outputs.staticWebAppUrl }}"
 
+  seed-staging-data:
+    name: Seed NYC Staging Data
+    runs-on: ubuntu-latest
+    needs: [deploy-infrastructure, deploy-functions]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Azure Login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Seed deterministic NYC session data
+        env:
+          AZURE_RESOURCE_GROUP: ${{ env.RESOURCE_GROUP }}
+          COSMOS_ACCOUNT_NAME: ${{ needs.deploy-infrastructure.outputs.cosmosDbAccountName }}
+          COSMOS_DATABASE_ID: swimlessons
+          SESSIONS_CSV_PATH: data/sessions-template.csv
+        run: npm run seed:staging:nyc
+
   run-smoke-tests:
     name: Run Smoke Tests
     runs-on: ubuntu-latest
-    needs: [deploy-infrastructure, deploy-functions, deploy-web-app]
+    needs: [deploy-infrastructure, deploy-functions, deploy-web-app, seed-staging-data]
 
     steps:
       - name: Checkout code
@@ -194,8 +230,4 @@ jobs:
 
       - name: Run smoke tests
         run: |
-          curl --fail --silent --show-error --retry 8 --retry-delay 10 --retry-all-errors \
-            "${{ needs.deploy-infrastructure.outputs.staticWebAppUrl }}/"
-          curl --fail --silent --show-error --retry 8 --retry-delay 10 --retry-all-errors \
-            "${{ needs.deploy-infrastructure.outputs.staticWebAppUrl }}/api/cities"
-          echo "✅ Smoke tests passed"
+          npm run smoke:staging -- "${{ needs.deploy-infrastructure.outputs.staticWebAppUrl }}"

@@ -146,11 +146,37 @@ async function validateWorkflow(env) {
     `${env.workflowPath} must update authsettingsV2`
   );
 
-  assertContains(
-    workflow,
-    '/api/cities',
-    `${env.workflowPath} must smoke test /api/cities`
-  );
+  if (env.name === 'staging') {
+    assertContains(
+      workflow,
+      'cosmosDbAccountName',
+      `${env.workflowPath} must capture cosmosDbAccountName from the Bicep deployment outputs`
+    );
+
+    assertContains(
+      workflow,
+      'Seed NYC Staging Data',
+      `${env.workflowPath} must seed deterministic NYC staging data before smoke tests`
+    );
+
+    assertContains(
+      workflow,
+      'npm run seed:staging:nyc',
+      `${env.workflowPath} must run npm run seed:staging:nyc`
+    );
+
+    assertContains(
+      workflow,
+      'npm run smoke:staging --',
+      `${env.workflowPath} must run the staged end-to-end smoke script`
+    );
+  } else {
+    assertContains(
+      workflow,
+      '/api/cities',
+      `${env.workflowPath} must smoke test /api/cities`
+    );
+  }
 }
 
 async function validateParameterFile(env) {

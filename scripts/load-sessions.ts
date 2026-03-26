@@ -8,7 +8,9 @@
  * start_date,end_date,days_of_week,time_start,time_end,price,capacity,
  * enrolled,registration_url,notes
  *
- * Usage: npx tsx scripts/load-sessions.ts [path-to-csv]
+ * Usage:
+ *   npm run seed:nyc
+ *   npx tsx scripts/load-sessions.ts [path-to-csv]
  */
 
 import * as path from 'path';
@@ -24,7 +26,7 @@ const connectionString = process.env.COSMOS_CONNECTION_STRING;
 const databaseId = process.env.COSMOS_DATABASE_ID || 'swimlessons';
 
 if (!connectionString) {
-  console.error('❌ COSMOS_CONNECTION_STRING not set in .env');
+  console.error('❌ COSMOS_CONNECTION_STRING environment variable is not set');
   process.exit(1);
 }
 

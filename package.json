@@ -8,6 +8,9 @@
     "build": "tsc",
     "build:functions:deploy": "node scripts/build-functions-deploy.mjs",
     "build:watch": "tsc --watch",
+    "seed:nyc": "tsx scripts/load-sessions.ts data/sessions-template.csv",
+    "seed:staging:nyc": "node scripts/seed-staging-nyc.mjs",
+    "smoke:staging": "node scripts/run-staging-smoke.mjs",
     "validate:deployment-contract": "node scripts/validate-deployment-contract.mjs",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
@@ -23,14 +26,15 @@
     "deploy:web": "echo 'Deploy web app to Azure Static Web App'"
   },
   "dependencies": {
+    "@azure/app-configuration": "^1.5.0",
     "@azure/cosmos": "^4.0.0",
+    "@azure/functions": "^4.5.0",
     "@azure/identity": "^4.0.0",
     "@azure/keyvault-secrets": "^4.8.0",
-    "@azure/app-configuration": "^1.5.0",
-    "@azure/functions": "^4.5.0",
     "applicationinsights": "^2.9.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.41.0",
     "@types/node": "^22.0.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
@@ -38,9 +42,9 @@
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
     "prettier": "^3.2.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.3.0",
-    "vitest": "^1.2.0",
-    "@playwright/test": "^1.41.0"
+    "vitest": "^1.2.0"
   },
   "engines": {
     "node": ">=22.0.0 <23"

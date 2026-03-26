@@ -10,6 +10,19 @@
 
 ---
 
+## 🔁 **Deterministic Seed Behavior**
+
+The loader is now self-contained for the NYC MVP seed path:
+
+- It reads `data/sessions-template.csv`
+- It upserts the NYC DOE provider document
+- It upserts the related location and program documents needed by search and session-details
+- It can reseed staging directly with `npm run seed:staging:nyc` after `az login`
+
+That means staging can be restored to a known 10-session baseline without manual Cosmos edits.
+
+---
+
 ## 📋 **Template Overview**
 
 **File:** `data/sessions-template.csv`
@@ -40,8 +53,7 @@
 **Just load the example data:**
 
 ```powershell
-cd scripts
-npx tsx load-sessions.ts
+npm run seed:nyc
 ```
 
 **Result:**
@@ -111,13 +123,12 @@ facility_id,program_name,skill_level,age_min_months,age_max_months,start_date,en
 **Step 3: Load Sessions**
 
 ```powershell
-cd scripts
-npx tsx load-sessions.ts
+npm run seed:nyc
 ```
 
 **Or load custom CSV:**
 ```powershell
-npx tsx load-sessions.ts ../data/my-custom-sessions.csv
+npx tsx scripts/load-sessions.ts data/my-custom-sessions.csv
 ```
 
 ---
@@ -139,7 +150,7 @@ npx tsx load-sessions.ts ../data/my-custom-sessions.csv
 
 3. **Load:**
    ```powershell
-   npx tsx load-sessions.ts ../data/summer-2026-sessions.csv
+   npx tsx scripts/load-sessions.ts data/summer-2026-sessions.csv
    ```
 
 ---
@@ -247,8 +258,7 @@ cat data/nyc-pools-sample.csv | cut -d',' -f2
 **To get started immediately with example data:**
 
 ```powershell
-cd scripts
-npx tsx load-sessions.ts
+npm run seed:nyc
 ```
 
 **This loads 10 example sessions** so you can:
@@ -321,12 +331,18 @@ npx tsx load-sessions.ts
 
 ### **Load Template Sessions:**
 ```powershell
-npx tsx load-sessions.ts
+npm run seed:nyc
 ```
 
 ### **Load Custom CSV:**
 ```powershell
-npx tsx load-sessions.ts ../data/my-sessions.csv
+npx tsx scripts/load-sessions.ts data/my-sessions.csv
+```
+
+### **Reseed Staging NYC Data:**
+```powershell
+az login
+npm run seed:staging:nyc
 ```
 
 ### **Verify in Cosmos DB:**
@@ -356,8 +372,7 @@ curl -X POST https://func-swim-r5bmpt.azurewebsites.net/api/search -H "Content-T
 
 **Ready to load:**
 ```powershell
-cd scripts
-npx tsx load-sessions.ts
+npm run seed:nyc
 ```
 
 **Takes 1 minute, adds 10 searchable sessions!** 🏊
@@ -369,7 +384,7 @@ npx tsx load-sessions.ts
 **Load the template now** for immediate functionality:
 
 ```powershell
-npx tsx load-sessions.ts
+npm run seed:nyc
 ```
 
 **Then this week:**

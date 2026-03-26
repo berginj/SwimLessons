@@ -1,6 +1,6 @@
 # Deployment Contract
 
-**Last Updated:** 2026-03-24
+**Last Updated:** 2026-03-25
 **Status:** Enforced in CI
 
 ## Purpose
@@ -64,9 +64,20 @@ Secrets must be fetched directly from Azure control-plane commands when needed.
 4. Normalize Function App auth with `authsettingsV2`.
 5. Deploy the Functions package.
 6. Deploy the Static Web App content.
-7. Smoke test `/` and `/api/cities`.
+7. For staging, seed the deterministic NYC session dataset before smoke tests.
+8. Smoke test `/`, `/api/cities`, `POST /api/search`, and `GET /api/sessions/{id}` on staging.
 
 If any of those steps are skipped, the deployment is incomplete.
+
+## Staging MVP Data Contract
+
+- Staging must not treat an empty NYC search experience as healthy.
+- The staging workflow must reseed the deterministic NYC dataset before smoke tests.
+- Staging smoke tests must assert:
+  - NYC appears in `/api/cities`
+  - NYC `availableSessionCount > 0`
+  - `POST /api/search` returns at least one result
+  - `GET /api/sessions/{id}?cityId=nyc` succeeds for a returned session
 
 ## Forbidden Changes
 
