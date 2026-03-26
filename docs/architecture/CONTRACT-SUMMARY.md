@@ -42,6 +42,13 @@ Deployment behavior is also contract-driven now.
 - CI enforces the deployment contract with `npm run validate:deployment-contract`.
 - Changes to GitHub workflows, Bicep deployment ownership, or SWA backend linking must satisfy that contract before merge.
 
+## 👪 Persona Contract
+
+The top-level user contract is now explicit.
+
+- [PARENT-PERSONA.md](./PARENT-PERSONA.md) defines the current NYC parent/caregiver persona, trust requirements, and approved defaults.
+- Workflow or product changes that materially alter the parent journey should be evaluated against that persona contract before lower-order technical changes.
+
 ## 🚇 Transit Router Contract
 
 NYC transit behavior is now explicitly contract-driven too.

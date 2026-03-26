@@ -11,6 +11,7 @@
 
 ### 🚀 Start Here
 **👉 [CONTRACT-SUMMARY.md](./CONTRACT-SUMMARY.md)** - Quick reference guide for all contracts
+**👉 [PARENT-PERSONA.md](./PARENT-PERSONA.md)** - Canonical parent/caregiver persona and trust requirements
 **👉 [ORCHESTRATION-TRACKER.md](./ORCHESTRATION-TRACKER.md)** - Canonical handoff, backlog, and next-task tracker for agents
 **👉 [DEPLOYMENT-CONTRACT.md](./DEPLOYMENT-CONTRACT.md)** - Deployment ownership, sequence, and anti-drift rules
 **👉 [TRANSIT-ROUTER-CONTRACT.md](./TRANSIT-ROUTER-CONTRACT.md)** - NYC schedule-based transit routing boundary and fallback rules

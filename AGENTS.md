@@ -26,12 +26,13 @@ Supporting operator-facing promise:
 
 Read in this order before making non-trivial changes:
 1. `AGENTS.md`
-2. `docs/architecture/ORCHESTRATION-TRACKER.md`
-3. `docs/architecture/DEPLOYMENT-CONTRACT.md`
-4. `docs/architecture/TRANSIT-ROUTER-CONTRACT.md`
-5. `docs/architecture/integration-flows.md`
-6. `src/core/contracts/*`
-7. The relevant area README or runbook for the code you are touching
+2. `docs/architecture/PARENT-PERSONA.md`
+3. `docs/architecture/ORCHESTRATION-TRACKER.md`
+4. `docs/architecture/DEPLOYMENT-CONTRACT.md`
+5. `docs/architecture/TRANSIT-ROUTER-CONTRACT.md`
+6. `docs/architecture/integration-flows.md`
+7. `src/core/contracts/*`
+8. The relevant area README or runbook for the code you are touching
 
 Treat most root-level status docs as historical unless the orchestration tracker explicitly points to them. In particular, do not treat files like `BUILD-STATUS.md`, `ACTUAL-STATUS.md`, or older rollout summaries as the live workboard.
 
@@ -75,6 +76,7 @@ Do not regress the app back toward:
 ### Preserve User Value
 
 - The primary persona is the NYC parent/caregiver searching for children’s swim lessons.
+- Read `docs/architecture/PARENT-PERSONA.md` before making parent-visible workflow changes.
 - The parent’s likely next need is trustworthy results plus trustworthy travel time, not platform purity for its own sake.
 - Changes that reduce deployment friction but damage parent-visible behavior are not acceptable.
 
