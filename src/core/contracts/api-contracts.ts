@@ -98,7 +98,7 @@ export interface SearchFiltersRequest {
     latest: string; // "19:00"
   };
   geographyIds?: string[]; // ["manhattan", "brooklyn"]
-  maxTravelMinutes?: number; // Only used if origin provided
+  maxTravelMinutes?: number; // Most relevant when an origin is available
   priceMax?: number;
   skillLevel?: ('beginner' | 'intermediate' | 'advanced' | 'all')[];
   facilityType?: ('outdoor' | 'indoor' | 'both')[];
@@ -458,6 +458,7 @@ export interface TelemetryEventRequest {
   sessionId: string;
   cityId: string;
   userId?: string;
+  platform: 'web' | 'ios' | 'android';
   properties: Record<string, unknown>;
 }
 

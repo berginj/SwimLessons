@@ -62,7 +62,7 @@ As of 2026-03-26, the repo is not in “foundation only” mode anymore. The liv
 - browser geolocation is opt-in and falls back to Times Square when denied or unavailable
 - transit estimates use an external OTP-style GraphQL router when configured and a deterministic fallback otherwise
 - top-10 search results receive transit enrichment; session details also compute travel time
-- telemetry infrastructure exists in code, but end-to-end `/api/events` is not yet the completed baseline
+- `/api/events` is part of the live Function surface for browser and operator telemetry
 
 Do not regress the app back toward:
 - empty NYC staging data
@@ -160,6 +160,7 @@ For staging specifically:
   - `/api/cities`
   - `POST /api/search`
   - `GET /api/sessions/{id}`
+  - `POST /api/events`
 
 Do not reintroduce any of these failure modes:
 - hardcoded shared `LOCATION` env vars in workflows

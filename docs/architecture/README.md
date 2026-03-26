@@ -63,7 +63,7 @@ Person C: Implements ISessionRepository → stores Session (from contract)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  PRESENTATION (React PWA)                                    │
+│  PRESENTATION (Static Web App HTML/CSS/JS)                   │
 │  Contract: api-contracts.ts (SearchRequest/SearchResponse)  │
 └──────────────────────────┬──────────────────────────────────┘
                            │

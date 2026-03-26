@@ -1,6 +1,6 @@
 # Integration Flows & Touchpoints
 
-This document describes how all components integrate using the defined contracts. Use this as your integration map when implementing services.
+This document describes how components integrate using the defined contracts. Use it as an integration map, but treat the search flow as the current NYC MVP baseline and the onboarding/data-sync sections as lower-confidence reference flows unless the orchestration tracker says otherwise.
 
 ## Table of Contents
 1. [Search Flow (User Journey)](#search-flow-user-journey)
@@ -18,7 +18,8 @@ This document describes how all components integrate using the defined contracts
 ```
 ┌─────────────┐
 │   Browser   │
-│  (React PWA)│
+│ (Static Web │
+│ App HTML/JS)│
 └──────┬──────┘
        │ 1. POST /api/search
        │    SearchRequest {
@@ -55,11 +56,13 @@ This document describes how all components integrate using the defined contracts
        │            AND c.startDate >= @startDateMin
        │            AND ...
        │
-       ├─ 3c. Calculate travel time (if origin provided)
+       ├─ 3c. Calculate travel time (browser origin if granted,
+       │      otherwise city default center / Times Square fallback)
        │      ITransitService.batchEstimate(origin, destinations, "walking", "nyc")
        │      └─> Check ICityConfigService for transit provider
-       │          └─> If "mta": call MTA API
-       │              Else: fallback to haversine distance
+       │          └─> If `TRANSIT_ROUTER_GRAPHQL_URL` is configured:
+       │              call OTP-style GraphQL router
+       │              Else: fallback to deterministic NYC estimate
        │
        ├─ 3d. Filter by age eligibility
        │      sessions.filter(s => childAge >= s.program.ageMin && childAge <= s.program.ageMax)
@@ -132,7 +135,8 @@ This document describes how all components integrate using the defined contracts
 
 **SearchService → TransitService**
 - **Contract**: `ITransitService.batchEstimate()`
-- **Fallback**: Returns null if city doesn't support transit, SearchService continues without travel time
+- **Current NYC MVP behavior**: top 10 search results receive transit enrichment
+- **Fallback**: if live routing is unavailable, SearchService continues with deterministic fallback estimates
 
 **SearchService → TelemetryService**
 - **Contract**: `ITelemetryService.trackSearchResults()`
@@ -351,8 +355,8 @@ This document describes how all components integrate using the defined contracts
 ┌────────────────────────────────────────────────────────────┐
 │                     PRESENTATION LAYER                      │
 │  ┌──────────────┐              ┌────────────────┐          │
-│  │ React PWA    │              │ Admin Portal   │          │
-│  │ (Frontend)   │              │ (Admin UI)     │          │
+│  │ Static Web   │              │ Admin Portal   │          │
+│  │ App Frontend │              │ (Deferred UI)  │          │
 │  └──────┬───────┘              └───────┬────────┘          │
 │         │                               │                   │
 │         └───────────────┬───────────────┘                   │

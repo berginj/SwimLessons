@@ -24,7 +24,7 @@ This contract does not currently guarantee:
 - nationwide transit support
 - production-grade realtime transit updates
 - bus-specific or rail-specific route planning guarantees
-- parent-provided origin capture in the UI
+- non-browser manual origin entry in the UI
 
 ## Provider Precedence
 
@@ -174,8 +174,8 @@ Function App settings:
   - applies per router request
 
 Staging baseline:
-- `TRANSIT_ROUTER_GRAPHQL_URL` may remain unset until the router service is deployed
-- once the router is deployed, staging should set this value through Bicep parameters or deployment configuration, not ad hoc portal edits
+- `TRANSIT_ROUTER_GRAPHQL_URL` is set in staging and should stay managed through deployment configuration, not ad hoc portal edits
+- the browser UI may provide origin via geolocation, but Times Square remains the deterministic fallback when location is unavailable or denied
 
 ## Hosting Contract
 

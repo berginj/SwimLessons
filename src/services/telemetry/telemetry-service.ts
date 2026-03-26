@@ -49,6 +49,7 @@ export class TelemetryService implements ITelemetryService {
         platform: event.platform,
         timestamp: event.timestamp,
         ...(event.experiments && { experiments: JSON.stringify(event.experiments) }),
+        ...this.serializeCustomProperties(event),
       },
     });
 
@@ -312,5 +313,61 @@ export class TelemetryService implements ITelemetryService {
       default:
         return 1; // Default to error
     }
+  }
+
+  private serializeCustomProperties(event: TelemetryEvent): Record<string, string> {
+    const customProperties: Record<string, string> = {};
+    const reservedKeys = new Set([
+      'eventName',
+      'timestamp',
+      'sessionId',
+      'cityId',
+      'userId',
+      'platform',
+      'experiments',
+    ]);
+
+    for (const [key, value] of Object.entries(event as unknown as Record<string, unknown>)) {
+      if (reservedKeys.has(key) || value === undefined || value === null) {
+        continue;
+      }
+
+      if (key === 'properties' && this.isRecord(value)) {
+        for (const [propertyKey, propertyValue] of Object.entries(value)) {
+          const serializedValue = this.serializePropertyValue(propertyValue);
+          if (serializedValue !== undefined) {
+            customProperties[`prop.${propertyKey}`] = serializedValue;
+          }
+        }
+        continue;
+      }
+
+      const serializedValue = this.serializePropertyValue(value);
+      if (serializedValue !== undefined) {
+        customProperties[`prop.${key}`] = serializedValue;
+      }
+    }
+
+    return customProperties;
+  }
+
+  private serializePropertyValue(value: unknown): string | undefined {
+    if (value === undefined || value === null) {
+      return undefined;
+    }
+
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      return String(value);
+    }
+
+    return JSON.stringify(value);
+  }
+
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 }

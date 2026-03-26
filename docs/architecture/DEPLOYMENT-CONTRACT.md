@@ -1,6 +1,6 @@
 # Deployment Contract
 
-**Last Updated:** 2026-03-25
+**Last Updated:** 2026-03-26
 **Status:** Enforced in CI
 
 ## Purpose
@@ -76,7 +76,7 @@ For NYC transit routing behavior, see [TRANSIT-ROUTER-CONTRACT.md](./TRANSIT-ROU
 5. Deploy the Functions package.
 6. Deploy the Static Web App content.
 7. For staging, seed the deterministic NYC session dataset before smoke tests.
-8. Smoke test `/`, `/api/cities`, `POST /api/search`, and `GET /api/sessions/{id}` on staging.
+8. Smoke test `/`, `/api/cities`, `POST /api/search`, `GET /api/sessions/{id}`, and `POST /api/events` on staging.
 
 If any of those steps are skipped, the deployment is incomplete.
 
@@ -89,6 +89,7 @@ If any of those steps are skipped, the deployment is incomplete.
   - NYC `availableSessionCount > 0`
   - `POST /api/search` returns at least one result
   - `GET /api/sessions/{id}?cityId=nyc` succeeds for a returned session
+  - `POST /api/events` accepts a valid browser telemetry payload
 
 ## Forbidden Changes
 

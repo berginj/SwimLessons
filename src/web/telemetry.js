@@ -6,6 +6,7 @@
  */
 
 const TELEMETRY_ENDPOINT = '/api/events';
+const DEFAULT_CITY_ID = 'nyc';
 
 // Session management
 let sessionId = null;
@@ -34,12 +35,9 @@ function createBaseEvent(eventName) {
     eventName,
     timestamp: new Date().toISOString(),
     sessionId: getSessionId(),
-    cityId: 'nyc', // TODO: Get from current city selection
+    cityId: DEFAULT_CITY_ID,
     userId: null, // Anonymous for MVP
     platform: 'web',
-    userAgent: navigator.userAgent,
-    viewportWidth: window.innerWidth,
-    viewportHeight: window.innerHeight,
   };
 }
 
@@ -70,8 +68,13 @@ function sendEvent(event) {
 export function trackPageLoaded(mode) {
   const event = {
     ...createBaseEvent('PageLoaded'),
-    mode, // 'live' or 'demo'
-    referrer: document.referrer || 'direct',
+    properties: {
+      mode,
+      referrer: document.referrer || 'direct',
+      userAgent: navigator.userAgent,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    },
   };
   sendEvent(event);
 }
@@ -86,9 +89,13 @@ export function trackSearchStarted(filters) {
 
   const event = {
     ...createBaseEvent('SearchStarted'),
-    filters,
-    hasLocation: filters.origin ? true : false,
-    filterCount: Object.keys(filters).filter((k) => filters[k] !== undefined && filters[k] !== null).length,
+    properties: {
+      filters,
+      hasLocation: filters.origin ? true : false,
+      filterCount: Object.keys(filters).filter(
+        (k) => filters[k] !== undefined && filters[k] !== null
+      ).length,
+    },
   };
   sendEvent(event);
 }
@@ -97,13 +104,16 @@ export function trackSearchStarted(filters) {
  * Track search results returned
  * ABANDONMENT POINT: User gets results but doesn't view any
  */
-export function trackSearchResultsReturned(resultCount, executionTimeMs, relaxationApplied) {
+export function trackSearchResultsReturned(resultCount, executionTimeMs, relaxationApplied, filters) {
   const event = {
     ...createBaseEvent('SearchResultsReturned'),
-    resultCount,
-    executionTimeMs,
-    relaxationApplied,
-    searchDurationMs: searchStartTime ? Date.now() - searchStartTime : null,
+    properties: {
+      resultCount,
+      executionTimeMs,
+      relaxationApplied,
+      filters,
+      searchDurationMs: searchStartTime ? Date.now() - searchStartTime : null,
+    },
   };
   sendEvent(event);
 }
@@ -115,13 +125,14 @@ export function trackSearchResultsReturned(resultCount, executionTimeMs, relaxat
 export function trackNoResults(filters, relaxationAttempted, relaxationSucceeded) {
   const event = {
     ...createBaseEvent('NoResults'),
-    filters,
-    relaxationAttempted,
-    relaxationSucceeded,
-    // Help identify coverage gaps
-    requestedGeographyIds: filters.geographyIds,
-    requestedDays: filters.daysOfWeek,
-    requestedAge: filters.childAge,
+    properties: {
+      filters,
+      relaxationAttempted,
+      relaxationSucceeded,
+      requestedGeographyIds: filters.geographyIds,
+      requestedDays: filters.daysOfWeek,
+      requestedAge: filters.childAge,
+    },
   };
   sendEvent(event);
 }
@@ -135,15 +146,16 @@ export function trackSessionViewed(session, position, distance) {
 
   const event = {
     ...createBaseEvent('SessionViewed'),
-    sessionId: session.id,
-    position, // 1-based rank in results
-    distance,
-    price: session.price,
-    availableSpots: session.availableSpots,
-    skillLevel: session.skillLevel,
-    // Context for abandonment analysis
-    sessionsViewedSoFar: sessionsViewedInCurrentSearch,
-    timeFromSearchMs: searchStartTime ? Date.now() - searchStartTime : null,
+    properties: {
+      viewedSessionId: session.id,
+      position,
+      distance,
+      price: session.price,
+      availableSpots: session.availableSpots,
+      skillLevel: session.skillLevel,
+      sessionsViewedSoFar: sessionsViewedInCurrentSearch,
+      timeFromSearchMs: searchStartTime ? Date.now() - searchStartTime : null,
+    },
   };
   sendEvent(event);
 }
@@ -155,13 +167,14 @@ export function trackSessionViewed(session, position, distance) {
 export function trackSignupClicked(session, position) {
   const event = {
     ...createBaseEvent('SignupClicked'),
-    sessionId: session.id,
-    destinationUrl: session.registrationUrl,
-    position,
-    price: session.price,
-    // Funnel metrics
-    searchToClickDurationMs: searchStartTime ? Date.now() - searchStartTime : null,
-    sessionsViewedBefore: sessionsViewedInCurrentSearch,
+    properties: {
+      viewedSessionId: session.id,
+      destinationUrl: session.registrationUrl,
+      position,
+      price: session.price,
+      searchToClickDurationMs: searchStartTime ? Date.now() - searchStartTime : null,
+      sessionsViewedBefore: sessionsViewedInCurrentSearch,
+    },
   };
   sendEvent(event);
 
@@ -177,12 +190,14 @@ export function trackSignupClicked(session, position) {
 export function trackFilterChanged(filterName, oldValue, newValue, resultCountBefore, resultCountAfter) {
   const event = {
     ...createBaseEvent('FilterChanged'),
-    filterName,
-    oldValue,
-    newValue,
-    resultCountBefore,
-    resultCountAfter,
-    resultImprovement: resultCountAfter - resultCountBefore,
+    properties: {
+      filterName,
+      oldValue,
+      newValue,
+      resultCountBefore,
+      resultCountAfter,
+      resultImprovement: resultCountAfter - resultCountBefore,
+    },
   };
   sendEvent(event);
 }
@@ -194,7 +209,9 @@ export function trackFilterChanged(filterName, oldValue, newValue, resultCountBe
 export function trackGeolocationDenied(reason) {
   const event = {
     ...createBaseEvent('GeolocationDenied'),
-    browserReason: reason,
+    properties: {
+      browserReason: reason,
+    },
   };
   sendEvent(event);
 }
@@ -206,6 +223,7 @@ export function trackGeolocationDenied(reason) {
 export function trackGeolocationGranted() {
   const event = {
     ...createBaseEvent('GeolocationGranted'),
+    properties: {},
   };
   sendEvent(event);
 }
@@ -219,16 +237,20 @@ export function trackPageAbandonment() {
   if (searchStartTime && sessionsViewedInCurrentSearch > 0) {
     const event = {
       ...createBaseEvent('PageAbandoned'),
-      timeOnPageMs: Date.now() - searchStartTime,
-      sessionsViewed: sessionsViewedInCurrentSearch,
-      abandonmentStage: 'AfterViewing', // Saw sessions but didn't click
+      properties: {
+        timeOnPageMs: Date.now() - searchStartTime,
+        sessionsViewed: sessionsViewedInCurrentSearch,
+        abandonmentStage: 'AfterViewing',
+      },
     };
     sendEvent(event);
   } else if (searchStartTime) {
     const event = {
       ...createBaseEvent('PageAbandoned'),
-      timeOnPageMs: Date.now() - searchStartTime,
-      abandonmentStage: 'AfterSearch', // Searched but didn't view
+      properties: {
+        timeOnPageMs: Date.now() - searchStartTime,
+        abandonmentStage: 'AfterSearch',
+      },
     };
     sendEvent(event);
   }
@@ -241,10 +263,12 @@ export function trackPageAbandonment() {
 export function trackError(errorType, errorMessage, operation) {
   const event = {
     ...createBaseEvent('Error'),
-    errorType,
-    errorMessage,
-    operation,
-    stackTrace: new Error().stack,
+    properties: {
+      errorType,
+      errorMessage,
+      operation,
+      stackTrace: new Error().stack,
+    },
   };
   sendEvent(event);
 }
@@ -256,7 +280,9 @@ export function trackError(errorType, errorMessage, operation) {
 export function trackModalOpened(sessionId) {
   const event = {
     ...createBaseEvent('ModalOpened'),
-    sessionId,
+    properties: {
+      viewedSessionId: sessionId,
+    },
   };
   sendEvent(event);
 }
@@ -264,8 +290,10 @@ export function trackModalOpened(sessionId) {
 export function trackModalClosed(sessionId, durationMs) {
   const event = {
     ...createBaseEvent('ModalClosed'),
-    sessionId,
-    viewDurationMs: durationMs,
+    properties: {
+      viewedSessionId: sessionId,
+      viewDurationMs: durationMs,
+    },
   };
   sendEvent(event);
 }
@@ -288,7 +316,9 @@ if (typeof window !== 'undefined') {
       // User switched away - potential abandonment signal
       const event = {
         ...createBaseEvent('PageHidden'),
-        timeOnPageMs: searchStartTime ? Date.now() - searchStartTime : null,
+        properties: {
+          timeOnPageMs: searchStartTime ? Date.now() - searchStartTime : null,
+        },
       };
       sendEvent(event);
     }

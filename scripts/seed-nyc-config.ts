@@ -95,7 +95,7 @@ const nycConfig: CityConfig = {
 
   // Feature flags
   features: {
-    transitETA: false, // Disabled for MVP (no real MTA API)
+    transitETA: true, // NYC MVP uses router-backed transit with deterministic fallback
     providerSelfServe: false, // V1 feature
   },
 

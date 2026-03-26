@@ -37,6 +37,7 @@ async function main() {
   await validateCosmosModule();
   await validateMainBicep();
   await validateDeployScript();
+  await validateStagingSmokeScript();
 
   if (errors.length > 0) {
     console.error('Deployment contract validation failed:');
@@ -330,6 +331,34 @@ async function validateDeployScript() {
     deployScript,
     'Redeploy Function App code so WEBSITE_RUN_FROM_PACKAGE is refreshed',
     'deploy.sh must warn that infra-only deploy does not replace a full Functions package deploy'
+  );
+}
+
+async function validateStagingSmokeScript() {
+  const smokeScript = await readRepoText('scripts/run-staging-smoke.mjs');
+
+  assertContains(
+    smokeScript,
+    '/api/cities',
+    'run-staging-smoke.mjs must verify /api/cities'
+  );
+
+  assertContains(
+    smokeScript,
+    '/api/search',
+    'run-staging-smoke.mjs must verify /api/search'
+  );
+
+  assertContains(
+    smokeScript,
+    '/api/sessions/',
+    'run-staging-smoke.mjs must verify /api/sessions/{id}'
+  );
+
+  assertContains(
+    smokeScript,
+    '/api/events',
+    'run-staging-smoke.mjs must verify /api/events'
   );
 }
 

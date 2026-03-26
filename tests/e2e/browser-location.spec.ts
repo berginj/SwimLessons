@@ -81,6 +81,7 @@ test.describe('browser location transit regression', () => {
   test('uses browser geolocation for search and session details', async ({ page }) => {
     const capturedSearchBodies: any[] = [];
     const capturedSessionDetailOrigins: string[] = [];
+    const capturedTelemetryRequests: any[] = [];
 
     await page.route('**/api/cities?includePreview=true', async (route) => {
       await route.fulfill({
@@ -142,6 +143,23 @@ test.describe('browser location transit regression', () => {
       });
     });
 
+    await page.route('**/api/events', async (route) => {
+      const requestBody = route.request().postDataJSON();
+      capturedTelemetryRequests.push(requestBody);
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            accepted: Array.isArray(requestBody?.events) ? requestBody.events.length : 0,
+            rejected: 0,
+          },
+        }),
+      });
+    });
+
     await page.goto('/');
 
     await expect(page.getByText(/Using Times Square as the travel-time starting point/i)).toBeVisible();
@@ -166,6 +184,33 @@ test.describe('browser location transit regression', () => {
     await expect(
       page.getByText('Approx. 17 min by subway from your current location for about 4.1 miles.')
     ).toBeVisible();
+
+    await expect
+      .poll(() =>
+        capturedTelemetryRequests.flatMap((request) =>
+          Array.isArray(request?.events) ? request.events : []
+        ).length
+      )
+      .toBeGreaterThan(0);
+
+    const telemetryEvents = capturedTelemetryRequests.flatMap((request) =>
+      Array.isArray(request?.events) ? request.events : []
+    );
+
+    const geolocationGrantedEvent = telemetryEvents.find(
+      (event) => event.eventName === 'GeolocationGranted'
+    );
+    expect(geolocationGrantedEvent).toMatchObject({
+      cityId: 'nyc',
+      platform: 'web',
+      properties: {},
+    });
+
+    const latestSearchStartedEvent = [...telemetryEvents]
+      .reverse()
+      .find((event) => event.eventName === 'SearchStarted');
+    expect(latestSearchStartedEvent?.properties?.hasLocation).toBe(true);
+    expect(latestSearchStartedEvent?.properties?.filters?.origin).toEqual(browserOrigin);
 
     await expect
       .poll(() => capturedSessionDetailOrigins.length)

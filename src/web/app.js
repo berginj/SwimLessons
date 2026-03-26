@@ -463,7 +463,7 @@ async function handleSearch(event) {
     const executionTime = performance.now() - searchStartTime;
 
     // TRACK: Results returned
-    telemetry.trackSearchResultsReturned(results.length, executionTime, false);
+    telemetry.trackSearchResultsReturned(results.length, executionTime, false, requestBody.filters);
 
     // TRACK: No results (critical abandonment point!)
     if (results.length === 0) {

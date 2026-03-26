@@ -81,6 +81,37 @@ async function main() {
     'Expected session-details response to match the searched session id'
   );
   console.log(`✓ /api/sessions/${sessionId}?cityId=nyc`);
+
+  const telemetryPayload = await fetchJson(`${baseUrl}/api/events`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      events: [
+        {
+          eventName: 'SmokeTest',
+          timestamp: new Date().toISOString(),
+          sessionId: 'staging-smoke',
+          cityId: 'nyc',
+          platform: 'web',
+          properties: {
+            source: 'staging-smoke',
+          },
+        },
+      ],
+    }),
+  });
+  assert(telemetryPayload.success === true, 'Expected /api/events to return success=true');
+  assert(
+    telemetryPayload.data?.accepted === 1,
+    `Expected /api/events accepted=1, found ${telemetryPayload.data?.accepted}`
+  );
+  assert(
+    telemetryPayload.data?.rejected === 0,
+    `Expected /api/events rejected=0, found ${telemetryPayload.data?.rejected}`
+  );
+  console.log('✓ /api/events');
   console.log('Staging smoke tests passed.');
 }
 

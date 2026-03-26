@@ -7,14 +7,17 @@
  * Factory pattern allows lazy initialization - services are created on first use.
  */
 
-import { ISearchService, ICityConfigService, ITransitService } from '@core/contracts/services';
-import { ITenantRepository, ISessionRepository } from '@core/contracts/repositories';
+import { TelemetryClient } from 'applicationinsights';
+import { ISearchService, ICityConfigService, ITransitService, ITelemetryService } from '@core/contracts/services';
+import { ITenantRepository, ISessionRepository, IEventRepository } from '@core/contracts/repositories';
 import { SearchService } from '@services/search/search-service';
 import { CityConfigService } from '@services/control-plane/city-config-service';
 import { TransitService } from '@services/transit/transit-service';
+import { TelemetryService } from '@services/telemetry/telemetry-service';
 import { CosmosDBClient, CosmosConfig, CONTAINERS, createCosmosClient } from '@infrastructure/cosmos/cosmos-client';
 import { TenantRepository } from '@infrastructure/cosmos/repositories/tenant-repository';
 import { SessionRepository } from '@infrastructure/cosmos/repositories/session-repository';
+import { EventRepository } from '@infrastructure/cosmos/repositories/event-repository';
 import { getEnvironmentConfig } from '@core/utils/env';
 
 /**
@@ -27,10 +30,12 @@ interface DependencyContainer {
   // Repositories
   tenantRepository: ITenantRepository;
   sessionRepository: ISessionRepository;
+  eventRepository: IEventRepository;
 
   // Services
   cityConfigService: ICityConfigService;
   transitService: ITransitService;
+  telemetryService: ITelemetryService;
   searchService: ISearchService;
 }
 
@@ -68,14 +73,20 @@ async function initializeDependencies(): Promise<DependencyContainer> {
   console.log('[DI] Initializing repositories...');
   const tenantsContainer = cosmosClient.getContainer(CONTAINERS.TENANTS);
   const sessionsContainer = cosmosClient.getContainer(CONTAINERS.SESSIONS);
+  const eventsContainer = cosmosClient.getContainer(CONTAINERS.EVENTS);
 
   const tenantRepository = new TenantRepository(tenantsContainer);
   const sessionRepository = new SessionRepository(sessionsContainer);
+  const eventRepository = new EventRepository(eventsContainer);
 
   // Initialize services
   console.log('[DI] Initializing services...');
   const cityConfigService = new CityConfigService(tenantRepository);
   const transitService = new TransitService();
+  const telemetryClient = new TelemetryClient(
+    config.applicationInsightsConnectionString || undefined
+  );
+  const telemetryService = new TelemetryService(telemetryClient, eventRepository);
   const searchService = new SearchService(sessionRepository, cityConfigService);
 
   // Create container
@@ -83,8 +94,10 @@ async function initializeDependencies(): Promise<DependencyContainer> {
     cosmosClient,
     tenantRepository,
     sessionRepository,
+    eventRepository,
     cityConfigService,
     transitService,
+    telemetryService,
     searchService,
   };
 

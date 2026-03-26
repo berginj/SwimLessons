@@ -10,6 +10,8 @@ src/functions/
 │   ├── search.ts           # Main search endpoint (POST /api/search)
 │   ├── session-details.ts  # Session details endpoint (GET /api/sessions/:sessionId)
 │   └── cities.ts           # Cities list endpoint (GET /api/cities)
+├── telemetry-api/
+│   └── events.ts           # Frontend telemetry endpoint (POST /api/events)
 ├── dependency-injection.ts # DI container and service factory
 ├── index.ts                # Entry point that registers all endpoints
 ├── package.json            # Functions-specific dependencies
@@ -173,6 +175,47 @@ GET /api/cities?includePreview=true
 **Error Responses:**
 - 500 Internal Server Error: Unexpected error
 
+### POST /api/events
+Track frontend telemetry events without blocking the parent journey.
+
+**Request:**
+```json
+{
+  "events": [
+    {
+      "eventName": "SearchStarted",
+      "timestamp": "2026-03-26T12:34:56.000Z",
+      "sessionId": "browser-session-123",
+      "cityId": "nyc",
+      "platform": "web",
+      "properties": {
+        "hasLocation": true,
+        "filters": {
+          "daysOfWeek": [1, 3, 5]
+        }
+      }
+    }
+  ]
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "accepted": 1,
+    "rejected": 0
+  },
+  "metadata": { ... }
+}
+```
+
+Notes:
+- The backend accepts the current contract-compliant `properties` envelope.
+- It also tolerates older flat event payloads and folds unknown top-level fields into `properties`.
+- The endpoint is anonymous and designed to fail soft from the browser's point of view.
+
 ## Dependency Injection
 
 The `dependency-injection.ts` file provides a singleton DI container that:
@@ -211,7 +254,7 @@ All endpoints track execution time and include it in the response metadata:
 ## Environment Variables Required
 
 - `COSMOS_CONNECTION_STRING`: Cosmos DB connection string
-- `COSMOS_DATABASE_ID`: Cosmos DB database ID (default: swim-lessons-db)
+- `COSMOS_DATABASE_ID`: Cosmos DB database ID (default: swimlessons)
 - `APP_CONFIG_ENDPOINT`: Azure App Configuration endpoint
 - `KEY_VAULT_NAME`: Azure Key Vault name
 - `APPLICATIONINSIGHTS_CONNECTION_STRING`: (optional) Application Insights connection
