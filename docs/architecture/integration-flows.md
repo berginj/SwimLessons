@@ -1,11 +1,22 @@
 # Integration Flows & Touchpoints
 
-This document describes how components integrate using the defined contracts. Use it as an integration map, but treat the search flow as the current NYC MVP baseline and the onboarding/data-sync sections as lower-confidence reference flows unless the orchestration tracker says otherwise.
+This document describes how components integrate using the defined contracts. Use it as an integration map for the current NYC MVP.
+
+What is current:
+- parent search, session details, telemetry, browser-origin handling, and transit enrichment
+- staging deployment, deterministic NYC seeding, and smoke verification
+
+What is not a current MVP workflow:
+- city onboarding UI
+- generic multi-city scheduled sync orchestration
+- admin-portal-driven setup flows
+
+Treat those deferred areas as backlog, not active implementation truth, unless the orchestration tracker explicitly restates them.
 
 ## Table of Contents
 1. [Search Flow (User Journey)](#search-flow-user-journey)
-2. [Data Sync Flow (Scheduled Job)](#data-sync-flow-scheduled-job)
-3. [City Onboarding Flow (Admin)](#city-onboarding-flow-admin)
+2. [Current Operator Flow (Staging Seed + Smoke)](#current-operator-flow-staging-seed--smoke)
+3. [Deferred Workflow Notes](#deferred-workflow-notes)
 4. [Dependency Graph](#dependency-graph)
 5. [Contract Enforcement Rules](#contract-enforcement-rules)
 
@@ -144,206 +155,90 @@ This document describes how components integrate using the defined contracts. Us
 
 ---
 
-## Data Sync Flow (Scheduled Job)
+## Current Operator Flow (Staging Seed + Smoke)
 
-### End-to-End: Daily sync updates session data from city sources
+### End-to-End: Push to `main` → staging gets a working NYC MVP slice
 
 ```
 ┌──────────────────────┐
-│  Azure Timer Trigger │
-│  Cron: "0 2 * * *"   │
-│  (2am daily)         │
+│  GitHub Actions      │
+│  cd-staging.yml      │
 └──────┬───────────────┘
-       │ 1. Trigger data-sync Function
+       │ 1. Deploy infra
+       │    Bicep + SWA backend link + auth normalization
        ▼
 ┌──────────────────────┐
-│  Function App        │
-│  src/functions/jobs/ │
-│  data-sync.ts        │
+│  Azure Resources     │
+│  Function App + SWA  │
 └──────┬───────────────┘
-       │ 2. Call IDataSyncService.syncAllCities()
+       │ 2. Deploy Function package + web app
        ▼
 ┌──────────────────────┐
-│  DataSyncService     │
-│  implements          │
-│  IDataSyncService    │
+│  Seed deterministic  │
+│  NYC data            │
+│  seed-staging-nyc    │
 └──────┬───────────────┘
-       │
-       ├─ 3a. Get all active cities
-       │      ICityConfigService.listCities()
-       │      └─> ITenantRepository.list({ status: "active" })
-       │          └─> Cosmos DB "tenants" container
-       │
-       └─ 3b. For each city, sync data
-              for (city of cities) {
-                syncCity(city.cityId)
-              }
-       │
+       │ 3. Upsert known provider/location/program/session docs
+       │    from data/sessions-template.csv
        ▼
 ┌──────────────────────┐
-│  DataSyncService     │
-│  syncCity("nyc")     │
+│  Restore router      │
+│  settings            │
 └──────┬───────────────┘
-       │
-       ├─ 4a. Get city adapter
-       │      adapterFactory.getAdapter("nyc")
-       │      └─> Returns ICityDataAdapter instance (e.g., NYCParksAdapter)
-       │
-       ├─ 4b. Run adapter sync
-       │      adapter.syncData()
-       │      └─> NYCParksAdapter.syncData()
-       │          ├─> Fetch from NYC Parks API
-       │          ├─> Transform to canonical schema
-       │          └─> Returns SyncResult {
-       │                success: true
-       │                recordsUpdated: 145
-       │                errors: []
-       │              }
-       │
-       ├─ 4c. Persist synced data
-       │      For each session in syncResult:
-       │        ISessionRepository.batchUpsertSessions(sessions)
-       │        └─> Cosmos DB bulk operation (efficient)
-       │
-       ├─ 4d. Track sync result
-       │      ITelemetryService.trackEvent({
-       │        eventName: "DataSync"
-       │        cityId: "nyc"
-       │        syncResult: { ... }
-       │      })
-       │
-       └─ 4e. Alert on failure
-              if (!syncResult.success) {
-                // Send alert (email/Slack)
-                // Log to Application Insights as error
-              }
-       │
+       │ 4. Reapply live transit-router URL and timeout
+       │    before smoke
        ▼
 ┌──────────────────────┐
-│  Return to Timer     │
-│  Trigger (complete)  │
+│  Staging smoke       │
+│  run-staging-smoke   │
+└──────┬───────────────┘
+       │ 5. Verify:
+       │    GET  /
+       │    GET  /api/cities
+       │    POST /api/search
+       │    GET  /api/sessions/{id}
+       │    POST /api/events
+       │    router-backed transit parity
+       ▼
+┌──────────────────────┐
+│  Live staging        │
+│  deterministic NYC   │
+│  MVP slice           │
 └──────────────────────┘
 ```
 
 ### Key Integration Points
 
-**Timer Trigger → DataSyncService**
-- **Contract**: `IDataSyncService.syncAllCities()`
-- **Error Handling**: Catches errors, logs to App Insights, doesn't crash
+**GitHub workflow → Bicep + Azure CLI**
+- **Contract**: `DEPLOYMENT-CONTRACT.md`
+- **Current truth**: workflow owns SWA backend linking, auth normalization, router restore, seeding, and smoke
 
-**DataSyncService → City Adapter**
-- **Contract**: `ICityDataAdapter.syncData()`
-- **Implementation**: Each city (NYC, LA, etc.) implements this
-- **Isolation**: Adapter failure doesn't affect other cities
+**Seed runner → Cosmos-backed repositories**
+- **Contract**: deterministic NYC seed data is part of the MVP contract
+- **Implementation**: `scripts/seed-staging-nyc.mjs` and `scripts/load-sessions.ts`
 
-**City Adapter → SessionRepository**
-- **Contract**: `ISessionRepository.batchUpsertSessions()`
-- **Performance**: Batch operation (100s of sessions at once)
-- **Idempotency**: Upsert by ID, safe to re-run
+**Smoke script → live staging app**
+- **Contract**: staging is not healthy unless seeded NYC search and session details actually work
+- **Implementation**: `scripts/run-staging-smoke.mjs`
 
-**DataSyncService → TelemetryService**
-- **Contract**: `ITelemetryService.trackEvent()`
-- **Monitoring**: Track sync success/failure rates
+**Router smoke → live OTP router**
+- **Contract**: staging smoke must prove router-backed transit, not fallback-only behavior
+- **Implementation**: `scripts/smoke-transit-router.mjs`
 
 ---
 
-## City Onboarding Flow (Admin)
+## Deferred Workflow Notes
 
-### End-to-End: Admin onboards new city via admin portal
+These flows are still represented in contracts, but they are not active NYC MVP workflows today:
 
-```
-┌─────────────┐
-│ Admin Portal│
-│  (React)    │
-└──────┬──────┘
-       │ 1. POST /admin/cities/onboard
-       │    OnboardCityRequest {
-       │      cityName: "Los Angeles"
-       │      timezone: "America/Los_Angeles"
-       │      adapterType: "csv-import"
-       │      adapterConfig: { csvData: "..." }
-       │    }
-       ▼
-┌──────────────────────┐
-│  Function App        │
-│  src/functions/      │
-│  admin-api/          │
-│  city-onboarding.ts  │
-└──────┬───────────────┘
-       │ 2. Call IOnboardingService.startOnboarding()
-       ▼
-┌──────────────────────┐
-│  OnboardingService   │
-│  implements          │
-│  IOnboardingService  │
-└──────┬───────────────┘
-       │
-       │ STEP 1: Generate cityId
-       ├─ 3. cityId = slugify("Los Angeles") = "la"
-       │
-       │ STEP 2-3: Create city config
-       ├─ 4. Build CityConfig object
-       │      ICityConfigService.createCity(config)
-       │      └─> ITenantRepository.create(tenantCatalog)
-       │          └─> Cosmos DB "tenants" container
-       │              Status: "preview" (not visible to users yet)
-       │
-       │ STEP 4: Validate adapter
-       ├─ 5. adapterFactory.getAdapter("la")
-       │      adapter.validateConfig()
-       │      └─> CSVAdapter.validateConfig()
-       │          ├─> Parse CSV headers
-       │          ├─> Check required fields
-       │          └─> Returns ValidationResult {
-       │                valid: true
-       │                errors: []
-       │                warnings: ["Missing price for 5 sessions"]
-       │              }
-       │
-       │ STEP 5: Preview data
-       ├─ 6. adapter.getSessions()
-       │      └─> Parse CSV, transform to canonical schema
-       │          Returns preview of first 10 sessions
-       │
-       │ STEP 6: Initial sync (if admin approves preview)
-       ├─ 7. adapter.syncData()
-       │      ISessionRepository.batchUpsertSessions(sessions)
-       │      └─> Cosmos DB "sessions" container
-       │          Partition key: /cityId = "la"
-       │          Creates: 50 providers, 120 locations, 500 sessions
-       │
-       │ STEP 7-9: Review & activate
-       ├─ 8. Admin reviews search results in preview mode
-       │      IFeatureFlagService.setFlag("city.la.status", "preview")
-       │      Only internal users see it
-       │
-       │ STEP 10: Activate
-       └─ 9. ICityConfigService.updateCity("la", { status: "active" })
-              IFeatureFlagService.setFlag("city.la.status", "active")
-              └─> City appears in public city list
-       │
-       ▼
-┌──────────────────────┐
-│  Return              │
-│  OnboardCityResponse │
-│  { cityId: "la" }    │
-└──────────────────────┘
-```
+- generic scheduled multi-city sync orchestration
+- city onboarding UI and preview/activation workflow
+- admin-portal-driven bulk upload flows
 
-### Key Integration Points
-
-**Admin Portal → OnboardingService**
-- **Contract**: `IOnboardingService.startOnboarding()`
-- **Validation**: Service validates request before creating city
-
-**OnboardingService → City Adapter**
-- **Contract**: `ICityDataAdapter.validateConfig()`, `syncData()`
-- **Adapter Factory**: `getAdapter(cityId)` returns correct adapter instance
-- **Polymorphism**: Different adapters (CSV, API, scraper) implement same interface
-
-**OnboardingService → FeatureFlagService**
-- **Contract**: `IFeatureFlagService.setFlag()`
-- **Preview Mode**: `city.{cityId}.status = "preview"` for testing
+Treat them as deferred reference areas only. If work resumes on any of them:
+- restate the workflow in `ORCHESTRATION-TRACKER.md`
+- update the persona/workflow contract first if the parent journey changes
+- avoid treating older diagrams in this file as implementation-ready specs
 
 ---
 

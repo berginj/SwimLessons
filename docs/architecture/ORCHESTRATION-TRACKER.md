@@ -33,8 +33,8 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Repo agent guidance: `AGENTS.md`
 - Parent persona contract: `docs/architecture/PARENT-PERSONA.md`
 - Transit-router contract: `docs/architecture/TRANSIT-ROUTER-CONTRACT.md`
-- Latest verified CI run: `23616011824` `CI Build` `success`
-- Latest verified staging deploy: `23616011817` `Deploy to Staging` `success`
+- Latest verified CI run: `23619607396` `CI Build` `success`
+- Latest verified staging deploy: `23619607389` `Deploy to Staging` `success`
 - Staging site: `https://ambitious-mud-07c32a410.1.azurestaticapps.net/`
 - Staging `/api/cities`: `success`, NYC present, `availableSessionCount: 10`
 - Staging `POST /api/search`: `success`, `total: 10`
@@ -45,7 +45,7 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Browser-provided origin override: shipped on `main`; Times Square remains the fallback when permission is denied or unavailable
 - Browser-origin regression coverage: Playwright covers granted-location propagation, denial fallback, reset-to-Times-Square behavior, and telemetry payload shape
 - Router-backed transit assertion: now part of the staging smoke contract and workflow path, with router settings restored from the live staging container before smoke
-- Current user-visible blocker: none critical in staging; the next quality gaps are future-state workflow cleanup and keeping browser-origin coverage aligned with UI changes
+- Current user-visible blocker: none critical in staging; the next quality gaps are keeping browser-origin coverage aligned with UI changes and deciding whether the operator runbook needs a richer dashboard
 
 ---
 
@@ -91,8 +91,8 @@ Note:
   - Function App app settings for transit router
 
 Current gaps:
-- `docs/architecture/integration-flows.md` still contains lower-confidence future-state sections outside the current NYC MVP
 - the operator runbook exists, but there is still no first-class dashboard surface if operators eventually need a richer UI
+- the remaining architecture summary docs still need periodic spot-checks so they do not drift back toward planning-era assumptions
 
 ---
 
@@ -103,7 +103,6 @@ Current gaps:
 | Keep deterministic NYC seed + smoke path stable | Data/Platform Agent | Maintain repo-owned seed and smoke behavior across staging deploys | None | product/story, repository, staging smoke path, deployment | parent, operator | Not blocked | Yes |
 | Extend browser-origin regression coverage as UI evolves | Frontend/QA Agent | Keep granted, denied, and reset browser-origin paths covered as the search UI changes | None | workflow, product/story, API, browser test harness | parent | Not blocked | Yes |
 | Build operator dashboard on top of city stats | Full-stack Agent | Turn the protected city stats query surface into a richer operator-facing surface if the CLI/runbook stops being enough | protected city stats endpoint, operator runbook | API, telemetry service, operator workflows | operator | Not blocked | Yes |
-| Trim lower-confidence future-state workflow docs | Docs/Architecture Agent | Reconcile older architecture narratives to the now-explicit persona and current NYC MVP | parent persona doc | persona, workflow, docs | parent, operator | Not blocked | Yes |
 
 ---
 
@@ -117,7 +116,6 @@ Scoring formula:
 | 360 | Keep deterministic NYC seed + smoke path stable | The seeded data and smoke path are now required deployment behavior | Preserves a working parent journey | Protects staging honesty and repeatability | Medium | Ongoing |
 | 345 | Keep browser-origin regression coverage current | The current flow is covered, but UI changes can easily break origin behavior again | Keeps the parent-facing geolocation flow trustworthy | Builds directly on the shipped Playwright harness | Medium | Ongoing |
 | 300 | Decide whether the operator stats runbook needs a richer dashboard | The protected stats endpoint now has a supported CLI/runbook path | Improves operational learning if the CLI becomes insufficient | Follows the new operator runbook | Medium | Follow-up |
-| 290 | Trim lower-confidence future-state workflow docs | Some older architecture docs still overstate future or generic behavior | Keeps agents aligned to the real NYC MVP | Follows the new persona contract | Medium | Follow-up |
 
 ---
 
@@ -149,6 +147,7 @@ Scoring formula:
 - Parent/caregiver persona is now formalized in `docs/architecture/PARENT-PERSONA.md`
 - The operator telemetry follow-up now has a query surface instead of only raw event ingestion
 - The operator telemetry query surface now also has a repo-owned CLI/runbook consumer
+- `integration-flows.md`, `CONTRACT-SUMMARY.md`, and `README.md` were trimmed to stop presenting deferred onboarding/data-sync flows as live NYC MVP truth
 
 ### Workflow/Code Areas Requiring Re-Review
 
@@ -164,19 +163,20 @@ Scoring formula:
 
 ## F. Next Recommended Tasks
 
-1. Trim lower-confidence future-state workflow docs
-   - Why next: the persona contract is now explicit, but some architecture docs still describe broader or older behavior
-   - Unblocks: cleaner agent pickup and less workflow drift
-   - Risk reduced: stale documentation pulling implementation in the wrong direction
+1. Decide whether the operator stats runbook needs a richer dashboard
+   - Why next: operators now have a working CLI/runbook, so the next question is whether they need a richer surface or whether the runbook is sufficient
+   - Unblocks: a more explicit operator workflow if product learning needs grow
+   - Risk reduced: telemetry remaining available but underused
 
-2. Trim lower-confidence future-state workflow docs
-   - Why next: the persona and deployment contracts are stronger than some older architecture narratives
-   - Unblocks: cleaner agent pickup and less stale workflow guidance
-   - Risk reduced: old docs pulling implementation away from the current NYC MVP
-3. Keep browser-origin regression coverage aligned with future UI changes
+2. Keep browser-origin regression coverage aligned with future UI changes
    - Why next: the denial/reset path is now covered and should stay covered
    - Unblocks: safer UI iteration on search and location controls
    - Risk reduced: regression of parent trust around geolocation behavior
+
+3. Keep deterministic NYC seed + smoke behavior stable as staging evolves
+   - Why next: the current MVP promise depends on seeded data and router-backed smoke remaining intact
+   - Unblocks: safer future feature work on search, telemetry, and operator surfaces
+   - Risk reduced: green deploys that drift away from usable staging
 
 ---
 

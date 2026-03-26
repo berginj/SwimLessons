@@ -1,14 +1,20 @@
 # Contract Summary - Quick Reference Guide
 
-**Last Updated:** 2026-03-23
+**Last Updated:** 2026-03-26
 **Team Size:** 2-4 people
-**Purpose:** Ensure alignment during parallel development
+**Purpose:** Quick contract reference for the current NYC MVP and supporting parallel work
 
 ---
 
 ## 📋 Overview
 
 This platform uses **contract-driven development** to enable your 2-4 person team to work in parallel without conflicts. Every integration point has a defined TypeScript interface.
+
+Current-reality note:
+- the live frontend is plain `src/web` HTML/CSS/JS, not React
+- the active operator surface is the protected `GET /api/operator/cities/{cityId}/stats` endpoint plus the CLI/runbook
+- staging is already a seeded NYC MVP environment, not a planning-only shell
+- the older staffing and onboarding examples below are still useful reference material, but they are not the active workboard
 
 ## 🎯 Core Principle
 
@@ -69,10 +75,29 @@ Do not treat older root-level status docs as the live workboard unless the orche
 
 ---
 
+## ✅ Current MVP Surface
+
+Parent-facing endpoints:
+- `GET /api/cities`
+- `POST /api/search`
+- `GET /api/sessions/{id}`
+- `POST /api/events`
+
+Operator-facing surface:
+- `GET /api/operator/cities/{cityId}/stats`
+- `npm run operator:city-stats -- --environment staging --city nyc`
+
+Operational baseline:
+- staging is deterministic and seeded with NYC session data
+- browser geolocation is opt-in and Times Square is the fallback
+- NYC transit uses the external router when configured and deterministic fallback otherwise
+
+---
+
 ## 🔗 Integration Map (Who Calls Who?)
 
 ```
-Frontend (React)
+Frontend (Static Web App HTML/CSS/JS)
     ↓ API Contracts (SearchRequest/SearchResponse)
 Function Apps
     ↓ Service Contracts (ISearchService)
@@ -241,32 +266,21 @@ const scored = this.scoreAndRank(sessions, cityConfig);
 return ApiResponseBuilder.success<SearchResponse>({ results: scored });
 ```
 
-### Pattern 2: Data Sync Flow
+### Pattern 2: Current Staging Operator Flow
 
 ```typescript
-// 1. Timer trigger runs Function App
-export async function dataSync() {
-  await dataSyncService.syncAllCities();
-}
-
-// 2. Service gets active cities
-const cities = await cityConfigService.listCities();
-
-// 3. For each city, get adapter
-for (const city of cities) {
-  const adapter = adapterFactory.getAdapter(city.cityId);
-
-  // 4. Run adapter sync
-  const syncResult = await adapter.syncData();
-
-  // 5. Adapter persists to repository
-  await sessionRepo.batchUpsertSessions(sessions);
-}
+await deployInfrastructure();
+await deployFunctions();
+await deployStaticWebApp();
+await seedStagingNyc();
+await restoreTransitRouterSettings();
+await runStagingSmoke();
 ```
 
-### Pattern 3: City Onboarding Flow
+### Pattern 3: Deferred Onboarding Flow
 
 ```typescript
+// This remains contract space, not active NYC MVP workflow today.
 // 1. Admin posts request
 const request: OnboardCityRequest = { cityName: "LA", ... };
 
@@ -468,6 +482,9 @@ describe('SearchService', () => {
 - `src/services/data-sync/` (implement `IDataSyncService`)
 - `src/functions/jobs/data-sync.ts` (timer-triggered Function)
 
+Note:
+- this is historical parallel-work guidance, not a statement that scheduled multi-city sync is active MVP scope today
+
 **Dependencies:**
 - Uses: `ISessionRepository` (Person C provides)
 - Uses: `ICityConfigService` (Person B provides)
@@ -558,6 +575,4 @@ You know contracts are working when:
 
 ---
 
-**Questions?** Bring them to weekly standup (Mondays 10am).
-
-**Good luck building! 🚀**
+**Questions?** Start with `AGENTS.md`, then the orchestration tracker and persona contract before treating older examples here as active scope.

@@ -3,7 +3,7 @@
 **Project:** Swim Lessons Discovery Platform
 **Architecture:** City-as-Tenant Multi-Tenant SaaS
 **Team:** 2-4 developers
-**Status:** Contracts Complete ✅
+**Status:** NYC MVP active; this file also preserves older contract-planning reference material
 
 ---
 
@@ -23,6 +23,21 @@
 
 ### 📝 Design Decisions
 - **[adr/](./adr/)** - Architecture Decision Records (coming soon)
+
+---
+
+## Current-Reality Note
+
+Use this file as architectural reference, not the live workboard.
+
+For current repo truth, start with:
+1. `AGENTS.md`
+2. `docs/architecture/PARENT-PERSONA.md`
+3. `docs/architecture/ORCHESTRATION-TRACKER.md`
+4. `docs/architecture/DEPLOYMENT-CONTRACT.md`
+
+Some later examples in this file still reflect the original contract-planning phase.
+They are helpful for understanding boundaries, but they should not override the current NYC MVP workflow described in the tracker and deployment contract.
 
 ---
 
