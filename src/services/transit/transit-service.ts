@@ -23,23 +23,20 @@ import { GoogleMapsTransitService } from './google-maps-transit';
 
 interface OtpPlanResponse {
   data?: {
-    plan?: {
-      itineraries?: Array<{
-        duration?: number;
-        legs?: Array<{
-          mode?: string;
-        }>;
+    planConnection?: {
+      edges?: Array<{
+        node?: {
+          duration?: number;
+          legs?: Array<{
+            mode?: string;
+          }>;
+        };
       }>;
     };
   };
   errors?: Array<{
     message?: string;
   }>;
-}
-
-interface OtpInputCoordinates {
-  lat: number;
-  lon: number;
 }
 
 /**
@@ -221,7 +218,7 @@ export class TransitService implements ITransitService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          query: OTP_PLAN_QUERY,
+          query: OTP_PLAN_CONNECTION_QUERY,
           variables,
         }),
         signal: controller.signal,
@@ -243,7 +240,7 @@ export class TransitService implements ITransitService {
         return null;
       }
 
-      const itinerary = payload.data?.plan?.itineraries?.[0];
+      const itinerary = payload.data?.planConnection?.edges?.[0]?.node;
       if (!itinerary) {
         return null;
       }
@@ -484,20 +481,19 @@ export class TransitService implements ITransitService {
     destination: Coordinates,
     departureTime?: string
   ) {
-    const { date, time } = this.getOtpDateTime(departureTime);
+    const dateTime = this.getOtpDateTime(departureTime);
 
     return {
-      from: this.toOtpCoordinates(origin),
-      to: this.toOtpCoordinates(destination),
-      date,
-      time,
-      numItineraries: 1,
-      walkReluctance: 1,
-      transportModes: [
-        {
-          mode: 'WALK',
-        },
-      ],
+      origin: this.toOtpLocation(origin, 'Origin'),
+      destination: this.toOtpLocation(destination, 'Destination'),
+      dateTime: {
+        earliestDeparture: dateTime,
+      },
+      first: 1,
+      modes: {
+        directOnly: true,
+        direct: ['WALK'],
+      },
     };
   }
 
@@ -506,47 +502,149 @@ export class TransitService implements ITransitService {
     destination: Coordinates,
     departureTime?: string
   ) {
-    const { date, time } = this.getOtpDateTime(departureTime);
+    const dateTime = this.getOtpDateTime(departureTime);
 
     return {
-      from: this.toOtpCoordinates(origin),
-      to: this.toOtpCoordinates(destination),
-      date,
-      time,
-      numItineraries: 1,
-      walkReluctance: 2.2,
-      transportModes: [
-        {
-          mode: 'WALK',
+      origin: this.toOtpLocation(origin, 'Origin'),
+      destination: this.toOtpLocation(destination, 'Destination'),
+      dateTime: {
+        earliestDeparture: dateTime,
+      },
+      first: 1,
+      modes: {
+        transitOnly: true,
+        transit: {
+          access: ['WALK'],
+          egress: ['WALK'],
+          transfer: ['WALK'],
+          transit: [
+            {
+              mode: 'SUBWAY',
+            },
+          ],
         },
-        {
-          mode: 'TRANSIT',
-        },
-      ],
+      },
     };
   }
 
-  private getOtpDateTime(departureTime?: string): { date: string; time: string } {
+  private getOtpDateTime(departureTime?: string): string {
+    const timePart = this.extractOtpTimePart(departureTime) || '17:00:00';
+
     if (!departureTime) {
-      return {
-        date: '2026-06-15',
-        time: '17:00',
-      };
+      const fallbackDate = this.getNextNewYorkDateForWeekday(3);
+      return `${fallbackDate}T${timePart}${this.getNewYorkOffsetForDate(fallbackDate)}`;
     }
 
-    const [date = '2026-06-15', rawTime = '17:00:00'] = departureTime.split('T');
-    const normalizedTime = rawTime.slice(0, 5);
+    const datePart = departureTime.slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+      const fallbackDate = this.getNextNewYorkDateForWeekday(3);
+      return `${fallbackDate}T${timePart}${this.getNewYorkOffsetForDate(fallbackDate)}`;
+    }
 
-    return {
-      date,
-      time: normalizedTime || '17:00',
-    };
+    const targetDate = this.isWithinCurrentServiceWindow(datePart)
+      ? datePart
+      : this.getNextNewYorkDateForWeekday(this.extractDayOfWeek(departureTime));
+
+    if (departureTime.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(departureTime)) {
+      return `${targetDate}T${timePart}${this.getNewYorkOffsetForDate(targetDate)}`;
+    }
+
+    return `${targetDate}T${timePart}${this.getNewYorkOffsetForDate(targetDate)}`;
   }
 
-  private toOtpCoordinates(coordinates: Coordinates): OtpInputCoordinates {
+  private extractOtpTimePart(departureTime?: string): string | null {
+    if (!departureTime) {
+      return null;
+    }
+
+    const match = departureTime.match(/T(\d{2}:\d{2})(?::(\d{2}))?/);
+    if (!match) {
+      return null;
+    }
+
+    return `${match[1]}:${match[2] || '00'}`;
+  }
+
+  private isWithinCurrentServiceWindow(datePart: string): boolean {
+    const targetDate = new Date(`${datePart}T12:00:00Z`);
+    const todayDate = new Date(`${this.getCurrentNewYorkDate()}T12:00:00Z`);
+    const diffDays = Math.round((targetDate.getTime() - todayDate.getTime()) / 86400000);
+    return diffDays >= 0 && diffDays <= 14;
+  }
+
+  private getNextNewYorkDateForWeekday(targetWeekday: number): string {
+    const baseDate = new Date(`${this.getCurrentNewYorkDate()}T12:00:00Z`);
+
+    for (let offset = 0; offset < 14; offset += 1) {
+      const candidate = new Date(baseDate);
+      candidate.setUTCDate(baseDate.getUTCDate() + offset);
+
+      if (candidate.getUTCDay() === targetWeekday) {
+        return this.formatIsoDate(candidate);
+      }
+    }
+
+    return this.formatIsoDate(baseDate);
+  }
+
+  private getCurrentNewYorkDate(): string {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const parts = formatter.formatToParts(new Date());
+    const year = parts.find((part) => part.type === 'year')?.value || '2026';
+    const month = parts.find((part) => part.type === 'month')?.value || '03';
+    const day = parts.find((part) => part.type === 'day')?.value || '26';
+
+    return `${year}-${month}-${day}`;
+  }
+
+  private formatIsoDate(date: Date): string {
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private getNewYorkOffsetForDate(datePart: string): string {
+    const [year, month, day] = datePart.split('-').map((value) => Number.parseInt(value, 10));
+    const noonUtc = new Date(Date.UTC(year || 2026, (month || 1) - 1, day || 1, 12, 0, 0));
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      timeZoneName: 'shortOffset',
+      hour: '2-digit',
+    });
+    const timeZoneName =
+      formatter.formatToParts(noonUtc).find((part) => part.type === 'timeZoneName')?.value ||
+      'GMT-4';
+    const match = timeZoneName.match(/GMT([+-]\d{1,2})(?::?(\d{2}))?/);
+
+    if (!match) {
+      return '-04:00';
+    }
+
+    const signAndHours = match[1] || '-4';
+    const sign = signAndHours.startsWith('-') ? '-' : '+';
+    const hours = signAndHours.replace(/^[+-]/, '').padStart(2, '0');
+    const minutes = (match[2] || '00').padStart(2, '0');
+    return `${sign}${hours}:${minutes}`;
+  }
+
+  private toOtpLocation(
+    coordinates: Coordinates,
+    label: string
+  ): { label: string; location: { coordinate: { latitude: number; longitude: number } } } {
     return {
-      lat: coordinates.latitude,
-      lon: coordinates.longitude,
+      label,
+      location: {
+        coordinate: {
+          latitude: coordinates.latitude,
+          longitude: coordinates.longitude,
+        },
+      },
     };
   }
 
@@ -579,29 +677,27 @@ export class TransitService implements ITransitService {
   }
 }
 
-const OTP_PLAN_QUERY = `
-  query Plan(
-    $from: InputCoordinates!
-    $to: InputCoordinates!
-    $date: String!
-    $time: String!
-    $transportModes: [TransportModeInput!]!
-    $numItineraries: Int!
-    $walkReluctance: Float
+const OTP_PLAN_CONNECTION_QUERY = `
+  query PlanConnection(
+    $origin: PlanLabeledLocationInput!
+    $destination: PlanLabeledLocationInput!
+    $dateTime: PlanDateTimeInput!
+    $modes: PlanModesInput!
+    $first: Int!
   ) {
-    plan(
-      from: $from
-      to: $to
-      date: $date
-      time: $time
-      transportModes: $transportModes
-      numItineraries: $numItineraries
-      walkReluctance: $walkReluctance
+    planConnection(
+      origin: $origin
+      destination: $destination
+      dateTime: $dateTime
+      modes: $modes
+      first: $first
     ) {
-      itineraries {
-        duration
-        legs {
-          mode
+      edges {
+        node {
+          duration
+          legs {
+            mode
+          }
         }
       }
     }

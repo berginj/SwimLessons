@@ -1,7 +1,7 @@
 # Transit Router Contract
 
 **Last Updated:** 2026-03-26
-**Status:** Drafted for implementation
+**Status:** Implemented in staging
 **Primary Persona:** NYC parent/caregiver searching for swim lessons
 
 ## Purpose
@@ -59,54 +59,68 @@ Required request shape:
 
 ```json
 {
-  "query": "GraphQL plan query",
+  "query": "GraphQL planConnection query",
   "variables": {
-    "from": { "lat": 40.758, "lon": -73.9855 },
-    "to": { "lat": 40.7831, "lon": -73.9712 },
-    "date": "2026-06-15",
-    "time": "17:00",
-    "transportModes": [
-      { "mode": "WALK" },
-      { "mode": "TRANSIT" }
-    ],
-    "numItineraries": 1,
-    "walkReluctance": 2.2
+    "origin": {
+      "label": "Times Square",
+      "location": {
+        "coordinate": { "latitude": 40.758, "longitude": -73.9855 }
+      }
+    },
+    "destination": {
+      "label": "Yankee Stadium",
+      "location": {
+        "coordinate": { "latitude": 40.8296, "longitude": -73.9262 }
+      }
+    },
+    "dateTime": {
+      "earliestDeparture": "2026-03-26T17:00:00-04:00"
+    },
+    "modes": {
+      "transitOnly": true,
+      "transit": {
+        "access": ["WALK"],
+        "egress": ["WALK"],
+        "transfer": ["WALK"],
+        "transit": [{ "mode": "SUBWAY" }]
+      }
+    },
+    "first": 1
   }
 }
 ```
 
 Required variable semantics:
-- `from`: origin coordinates
-- `to`: destination coordinates
-- coordinate fields must use `lat` and `lon`
-- `date`: lesson-day date in `YYYY-MM-DD`
-- `time`: lesson-time departure in `HH:MM`
-- `transportModes`: one itinerary request using either `WALK` alone or `WALK + TRANSIT`
-- `numItineraries`: `1`
-- `walkReluctance`: `1` for walking-only, `2.2` for transit requests
+- `origin` / `destination`: labeled coordinates
+- coordinate fields must use `latitude` and `longitude` under `location.coordinate`
+- `dateTime.earliestDeparture`: departure timestamp in ISO-8601 with New York offset
+- walking-only requests use `modes.directOnly = true` with `modes.direct = ["WALK"]`
+- subway requests use `modes.transitOnly = true` with `modes.transit.access/egress/transfer = ["WALK"]`
+- transit mode preference is expressed through `modes.transit.transit`
+- `first`: `1`
 
 Current repo compatibility note:
-- the Function App currently uses OTP's GTFS GraphQL `plan` query shape with `InputCoordinates` and `transportModes`
-- this is compatible with the documented GTFS GraphQL endpoint, but agents should not silently migrate the query shape without updating this contract and validating the live router
+- the Function App currently uses OTP's GTFS GraphQL `planConnection` shape
+- agents should not silently migrate back to the older `plan` query shape without updating this contract and validating the live router
 
 ## Response Contract
 
-The router must return a GraphQL response containing the first itinerary under `data.plan.itineraries[0]`.
+The router must return a GraphQL response containing the first itinerary under `data.planConnection.edges[0].node`.
 
 Required response fields:
 
 ```json
 {
   "data": {
-    "plan": {
-      "itineraries": [
-        {
+    "planConnection": {
+      "edges": [
+        { "node": {
           "duration": 1260,
           "legs": [
             { "mode": "WALK" },
             { "mode": "SUBWAY" }
           ]
-        }
+        }}
       ]
     }
   }
@@ -116,7 +130,7 @@ Required response fields:
 Required response semantics:
 - `duration` is in seconds
 - `legs[].mode` is used to derive the user-facing primary mode
-- if there is no first itinerary, the request is treated as unavailable and falls back
+- if there is no first edge/node itinerary, the request is treated as unavailable and falls back
 - GraphQL `errors` must be treated as a router failure, not a partial success
 
 ## Fallback Contract
@@ -144,7 +158,8 @@ Callers must pass `departureTime` when they have a lesson/session time.
 
 Current MVP behavior:
 - search and session-details should derive `departureTime` from the session start when available
-- if `departureTime` is missing, the transit layer uses a deterministic fallback date/time for repeatability
+- if `departureTime` is missing, the transit layer uses a deterministic weekday fallback date/time for repeatability
+- if `departureTime` is outside the current GTFS service window, the transit layer must proxy it to the next matching New York weekday/time inside the current service window
 
 Agents should not build new features that rely on the fallback default date/time as product behavior.
 
@@ -182,6 +197,7 @@ Minimum operational expectations:
 - refresh GTFS-derived graph on a defined cadence
 - document the cadence in the router runbook
 - explicitly handle MTA schedule-transition updates before calling the router “live”
+- until long-range GTFS schedules are available, far-future lesson dates are approximated by the next matching weekday/time in the current service window
 
 Realtime GTFS-RT support is a future enhancement and is not part of the current MVP contract.
 
@@ -200,6 +216,7 @@ This contract is satisfied when:
 - the router endpoint is documented and provisioned
 - `TRANSIT_ROUTER_GRAPHQL_URL` is set in staging
 - NYC walking/subway requests use the router when available
+- the transit smoke path proves both `routes` and `planConnection` are working against the live router
 - search and session-details still succeed when the router fails
 - smoke or regression coverage proves both router-backed and fallback behavior
 
