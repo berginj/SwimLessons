@@ -29,7 +29,7 @@ param transitRouterTimeoutMs int = 2500
 
 // === Cosmos DB (Serverless Mode) ===
 module cosmosDb 'modules/cosmos-db.bicep' = {
-  name: 'cosmosDb-deployment'
+  name: '${deployment().name}-cosmosDb'
   params: {
     accountName: 'cosmos-swim-${resourceSuffix}'
     location: location
@@ -40,7 +40,7 @@ module cosmosDb 'modules/cosmos-db.bicep' = {
 
 // === Azure App Configuration (Free Tier) ===
 module appConfiguration 'modules/app-configuration.bicep' = {
-  name: 'appConfig-deployment'
+  name: '${deployment().name}-appConfig'
   params: {
     configStoreName: 'appconfig-swim-${resourceSuffix}'
     location: location
@@ -51,7 +51,7 @@ module appConfiguration 'modules/app-configuration.bicep' = {
 
 // === Azure Key Vault (Standard Tier) ===
 module keyVault 'modules/key-vault.bicep' = {
-  name: 'keyVault-deployment'
+  name: '${deployment().name}-keyVault'
   params: {
     vaultName: 'kv-swim-${resourceSuffix}'
     location: location
@@ -62,7 +62,7 @@ module keyVault 'modules/key-vault.bicep' = {
 
 // === Function Apps (Consumption Plan) ===
 module functionApps 'modules/function-apps.bicep' = {
-  name: 'functionApps-deployment'
+  name: '${deployment().name}-functionApps'
   params: {
     functionAppName: 'func-swim-${resourceSuffix}'
     location: location
@@ -78,7 +78,7 @@ module functionApps 'modules/function-apps.bicep' = {
 
 // === Application Insights (Basic Tier, 5GB free) ===
 module appInsights 'modules/application-insights.bicep' = {
-  name: 'appInsights-deployment'
+  name: '${deployment().name}-appInsights'
   params: {
     appInsightsName: 'appi-swim-${resourceSuffix}'
     location: location
@@ -89,7 +89,7 @@ module appInsights 'modules/application-insights.bicep' = {
 
 // === Azure Static Web App (Standard tier required for linked backend) ===
 module staticWebApp 'modules/static-web-app.bicep' = {
-  name: 'staticWebApp-deployment'
+  name: '${deployment().name}-staticWebApp'
   params: {
     staticWebAppName: 'swa-swim-${resourceSuffix}'
     location: location

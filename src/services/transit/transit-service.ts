@@ -164,6 +164,32 @@ export class TransitService implements ITransitService {
     return estimates;
   }
 
+  private async googleMapsEstimate(
+    origin: Coordinates,
+    destination: Coordinates,
+    mode: TransitMode,
+    departureTime?: string
+  ): Promise<TransitEstimate | null> {
+    if (!this.googleMapsService) {
+      return null;
+    }
+
+    try {
+      const googleMode = this.mapToGoogleMode(mode.mode);
+      const departureDate = departureTime ? new Date(departureTime) : undefined;
+
+      return await this.googleMapsService.getTransitDirections(
+        origin,
+        destination,
+        googleMode,
+        departureDate
+      );
+    } catch (error) {
+      console.warn('Google Maps API failed, falling back to router/heuristic estimate:', error);
+      return null;
+    }
+  }
+
   private async estimateNycTransitTimeFromRouter(
     origin: Coordinates,
     destination: Coordinates,
@@ -431,6 +457,21 @@ export class TransitService implements ITransitService {
     const distance = EARTH_RADIUS_MILES * c;
 
     return distance;
+  }
+
+  private mapToGoogleMode(
+    mode: string
+  ): 'transit' | 'walking' | 'bicycling' | 'driving' {
+    const modeMap: Record<string, 'transit' | 'walking' | 'bicycling' | 'driving'> = {
+      subway: 'transit',
+      bus: 'transit',
+      rail: 'transit',
+      walking: 'walking',
+      biking: 'bicycling',
+      driving: 'driving',
+    };
+
+    return modeMap[mode] || 'transit';
   }
 
   private buildWalkingPlanVariables(

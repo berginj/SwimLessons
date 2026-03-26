@@ -219,6 +219,18 @@ async function validateMainBicep() {
     'cosmosDbConnectionString',
     'main.bicep must not emit Cosmos DB connection strings via outputs'
   );
+
+  assertContains(
+    mainBicep,
+    "name: '${deployment().name}-cosmosDb'",
+    'main.bicep must make nested Cosmos DB deployment names unique per top-level deployment'
+  );
+
+  assertContains(
+    mainBicep,
+    "name: '${deployment().name}-staticWebApp'",
+    'main.bicep must make nested Static Web App deployment names unique per top-level deployment'
+  );
 }
 
 async function validateCosmosModule() {

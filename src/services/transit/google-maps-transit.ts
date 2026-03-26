@@ -104,7 +104,7 @@ export class GoogleMapsTransitService {
         return null;
       }
 
-      const data: GoogleMapsDirectionsResponse = await response.json();
+      const data = (await response.json()) as GoogleMapsDirectionsResponse;
 
       // Check API status
       if (data.status !== 'OK') {

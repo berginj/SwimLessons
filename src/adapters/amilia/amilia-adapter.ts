@@ -19,20 +19,18 @@ import {
   TransitEstimate,
 } from '@core/models/canonical-schema';
 import { Coordinates, TransitMode, CityConfig } from '@core/contracts/city-config';
+import { getEnvOptional } from '@core/utils/env';
 import { AmiliaClient } from './amilia-client';
 
 /**
  * Amilia Adapter - Transforms Amilia data to canonical schema
  */
 export class AmiliaAdapter extends BaseAdapter {
-  private client: AmiliaClient;
+  private client: AmiliaClient | null = null;
   private organizationIds: number[]; // YMCA/JCC org IDs to sync
 
   constructor(cityId: string, config: CityConfig) {
     super(cityId);
-
-    // Initialize Amilia client
-    this.client = new AmiliaClient();
 
     // Get organization IDs from config
     // Format: "12345,67890,11111" (comma-separated YMCA org IDs)
@@ -53,9 +51,10 @@ export class AmiliaAdapter extends BaseAdapter {
   async getLocations(): Promise<Location[]> {
     const locations: Location[] = [];
     const locationMap = new Map<string, Location>(); // Dedupe by address
+    const client = this.getClient();
 
     for (const orgId of this.organizationIds) {
-      const activities = await this.client.getActivities({ organizationId: orgId });
+      const activities = await client.getActivities({ organizationId: orgId });
 
       for (const activity of activities) {
         if (!activity.Location) continue;
@@ -101,9 +100,10 @@ export class AmiliaAdapter extends BaseAdapter {
    */
   async getProviders(): Promise<Provider[]> {
     const providers: Provider[] = [];
+    const client = this.getClient();
 
     for (const orgId of this.organizationIds) {
-      const org = await this.client.getOrganization(orgId);
+      const org = await client.getOrganization(orgId);
 
       if (org) {
         providers.push({
@@ -133,9 +133,10 @@ export class AmiliaAdapter extends BaseAdapter {
    */
   async getPrograms(): Promise<Program[]> {
     const programs: Program[] = [];
+    const client = this.getClient();
 
     for (const orgId of this.organizationIds) {
-      const activities = await this.client.getActivities({ organizationId: orgId });
+      const activities = await client.getActivities({ organizationId: orgId });
 
       for (const activity of activities) {
         // Only include swim-related activities
@@ -161,7 +162,7 @@ export class AmiliaAdapter extends BaseAdapter {
             ? {
                 min: activity.Price,
                 max: activity.Price,
-                currency: activity.Currency || 'USD',
+                currency: 'USD',
                 unit: 'program',
               }
             : undefined,
@@ -181,13 +182,14 @@ export class AmiliaAdapter extends BaseAdapter {
    */
   async getSessions(filters?: { startDate?: string; endDate?: string }): Promise<Session[]> {
     const sessions: Session[] = [];
+    const client = this.getClient();
 
     const activityFilters: any = {};
     if (filters?.startDate) activityFilters.startDate = filters.startDate;
     if (filters?.endDate) activityFilters.endDate = filters.endDate;
 
     for (const orgId of this.organizationIds) {
-      const activities = await this.client.getActivities({
+      const activities = await client.getActivities({
         organizationId: orgId,
         ...activityFilters,
       });
@@ -222,7 +224,7 @@ export class AmiliaAdapter extends BaseAdapter {
           price: activity.Price
             ? {
                 amount: activity.Price,
-                currency: activity.Currency || 'USD',
+                currency: 'USD',
               }
             : undefined,
           searchTerms: `${activity.Name} ${activity.Description || ''} amilia ymca jcc`.toLowerCase(),
@@ -272,11 +274,11 @@ export class AmiliaAdapter extends BaseAdapter {
    * Sync data from Amilia API
    */
   async syncData(): Promise<SyncResult> {
-    const startTime = Date.now();
     const errors: any[] = [];
+    const client = this.getClient();
 
     try {
-      await this.client.authenticate();
+      await client.authenticate();
 
       const providers = await this.getProviders();
       const locations = await this.getLocations();
@@ -323,7 +325,9 @@ export class AmiliaAdapter extends BaseAdapter {
     const warnings: string[] = [];
 
     // Check API credentials
-    if (!this.apiKey || !this.apiSecret) {
+    const apiKey = getEnvOptional('AMILIA_API_KEY', '').trim();
+    const apiSecret = getEnvOptional('AMILIA_API_SECRET', '').trim();
+    if (!apiKey || !apiSecret) {
       errors.push('Amilia API credentials not configured (AMILIA_API_KEY, AMILIA_API_SECRET)');
     }
 
@@ -336,7 +340,7 @@ export class AmiliaAdapter extends BaseAdapter {
     // Try to authenticate
     if (errors.length === 0) {
       try {
-        await this.client.authenticate();
+        await this.getClient().authenticate();
         console.log('✅ Amilia authentication successful');
       } catch (error: any) {
         errors.push(`Authentication failed: ${error.message}`);
@@ -351,6 +355,14 @@ export class AmiliaAdapter extends BaseAdapter {
   }
 
   // ========== PRIVATE HELPERS ==========
+
+  private getClient(): AmiliaClient {
+    if (!this.client) {
+      this.client = new AmiliaClient();
+    }
+
+    return this.client;
+  }
 
   /**
    * Check if activity is swim-related

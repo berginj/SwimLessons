@@ -92,7 +92,7 @@ export class AmiliaClient {
       throw new Error(`Amilia authentication failed: ${response.status} ${response.statusText}`);
     }
 
-    const data: AmiliaAuthResponse = await response.json();
+    const data = (await response.json()) as AmiliaAuthResponse;
 
     this.jwtToken = data.token;
     this.tokenExpiry = new Date(data.expiresAt);
