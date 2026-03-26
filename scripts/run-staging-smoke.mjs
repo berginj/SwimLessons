@@ -5,6 +5,8 @@ const DEFAULT_TRANSIT_ORIGIN = {
   longitude: -73.9855,
 };
 const ROUTER_DURATION_TOLERANCE_MINUTES = 5;
+const ROUTER_ASSERTION_RETRY_COUNT = 6;
+const ROUTER_ASSERTION_RETRY_DELAY_MS = 10000;
 const OTP_PLAN_CONNECTION_QUERY = `
   query PlanConnection(
     $origin: PlanLabeledLocationInput!
@@ -58,6 +60,10 @@ function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function fetchRouterPlan(origin, destination, departureTime) {
@@ -324,18 +330,36 @@ async function main() {
 
     const departureTime = `${routerSessionPayload.data.session.startDate}T${routerSessionPayload.data.session.timeOfDay.start}`;
     const routerPlan = await fetchRouterPlan(DEFAULT_TRANSIT_ORIGIN, routerLocation, departureTime);
-    const apiMinutes = routerSessionPayload.data?.travelTime?.minutes;
+    let latestApiMinutes = routerSessionPayload.data?.travelTime?.minutes;
+    let matchedRouterDuration =
+      typeof latestApiMinutes === 'number' &&
+      Math.abs(latestApiMinutes - routerPlan.durationMinutes) <= ROUTER_DURATION_TOLERANCE_MINUTES;
+
+    for (let attempt = 1; !matchedRouterDuration && attempt <= ROUTER_ASSERTION_RETRY_COUNT; attempt += 1) {
+      console.log(
+        `• router-backed transit not ready yet (attempt ${attempt}/${ROUTER_ASSERTION_RETRY_COUNT}, API ${latestApiMinutes ?? 'n/a'} min vs router ${routerPlan.durationMinutes} min); waiting ${Math.round(ROUTER_ASSERTION_RETRY_DELAY_MS / 1000)}s`
+      );
+      await sleep(ROUTER_ASSERTION_RETRY_DELAY_MS);
+
+      const retryPayload = await fetchJson(
+        `${baseUrl}/api/sessions/${encodeURIComponent(routerCandidate.session.id)}?cityId=nyc`
+      );
+      latestApiMinutes = retryPayload.data?.travelTime?.minutes;
+      matchedRouterDuration =
+        typeof latestApiMinutes === 'number' &&
+        Math.abs(latestApiMinutes - routerPlan.durationMinutes) <= ROUTER_DURATION_TOLERANCE_MINUTES;
+    }
 
     assert(
-      typeof apiMinutes === 'number',
+      typeof latestApiMinutes === 'number',
       'Expected router-backed session details to include travelTime.minutes'
     );
     assert(
-      Math.abs(apiMinutes - routerPlan.durationMinutes) <= ROUTER_DURATION_TOLERANCE_MINUTES,
-      `Expected API/router transit durations to be within ${ROUTER_DURATION_TOLERANCE_MINUTES} minutes, got API=${apiMinutes}, router=${routerPlan.durationMinutes}`
+      matchedRouterDuration,
+      `Expected API/router transit durations to be within ${ROUTER_DURATION_TOLERANCE_MINUTES} minutes after retrying, got API=${latestApiMinutes}, router=${routerPlan.durationMinutes}`
     );
     console.log(
-      `✓ router-backed transit assertion (${routerCandidate.session.id}: API ${apiMinutes} min, router ${routerPlan.durationMinutes} min, modes ${routerPlan.modes.join(', ')})`
+      `✓ router-backed transit assertion (${routerCandidate.session.id}: API ${latestApiMinutes} min, router ${routerPlan.durationMinutes} min, modes ${routerPlan.modes.join(', ')})`
     );
   } else {
     console.log('• router-backed transit assertion skipped (TRANSIT_ROUTER_GRAPHQL_URL not set)');
