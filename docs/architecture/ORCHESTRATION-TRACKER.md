@@ -33,8 +33,8 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Repo agent guidance: `AGENTS.md`
 - Parent persona contract: `docs/architecture/PARENT-PERSONA.md`
 - Transit-router contract: `docs/architecture/TRANSIT-ROUTER-CONTRACT.md`
-- Latest verified CI run: `23619607396` `CI Build` `success`
-- Latest verified staging deploy: `23619607389` `Deploy to Staging` `success`
+- Latest verified CI run: `23620716715` `CI Build` `success`
+- Latest verified staging deploy: `23620716694` `Deploy to Staging` `success`
 - Staging site: `https://ambitious-mud-07c32a410.1.azurestaticapps.net/`
 - Staging `/api/cities`: `success`, NYC present, `availableSessionCount: 10`
 - Staging `POST /api/search`: `success`, `total: 10`
