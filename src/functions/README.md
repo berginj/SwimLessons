@@ -6,6 +6,8 @@ This directory contains all Azure Function HTTP endpoints for the swim lessons d
 
 ```
 src/functions/
+├── admin-api/
+│   └── city-stats.ts       # Operator stats endpoint (GET /api/admin/cities/{cityId}/stats)
 ├── search-api/
 │   ├── search.ts           # Main search endpoint (POST /api/search)
 │   ├── session-details.ts  # Session details endpoint (GET /api/sessions/:sessionId)
@@ -215,6 +217,61 @@ Notes:
 - The backend accepts the current contract-compliant `properties` envelope.
 - It also tolerates older flat event payloads and folds unknown top-level fields into `properties`.
 - The endpoint is anonymous and designed to fail soft from the browser's point of view.
+
+### GET /api/admin/cities/{cityId}/stats
+Read-only operator stats endpoint for the NYC MVP.
+
+**Auth:**
+- `authLevel: function`
+- call it directly on the Function App with either `x-functions-key` or `?code=<function-key>`
+
+**Query Parameters:**
+- `startDate` (optional): ISO timestamp, defaults to 30 days before `endDate`
+- `endDate` (optional): ISO timestamp, defaults to now
+
+**Example:**
+```
+GET /api/admin/cities/nyc/stats?startDate=2026-03-01T00:00:00.000Z&endDate=2026-03-26T23:59:59.999Z
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "cityId": "nyc",
+    "stats": {
+      "totalProviders": 4,
+      "totalLocations": 6,
+      "totalSessions": 10,
+      "activeSessionsCount": 10,
+      "dataConfidence": {
+        "high": 3,
+        "medium": 8,
+        "low": 9
+      },
+      "dailyActiveUsers": 12,
+      "totalSearches": 47,
+      "totalSignupClicks": 8,
+      "conversionRate": 0.17,
+      "avgResultsPerSearch": 6.2,
+      "noResultsRate": 0.09,
+      "relaxationSuccessRate": 0.0,
+      "avgSearchLatencyMs": 142,
+      "p95SearchLatencyMs": 280,
+      "errorRate": 0.02,
+      "lastSyncAt": "2026-03-26T18:30:00.000Z",
+      "lastSyncStatus": "success",
+      "lastSyncRecordsUpdated": 10
+    }
+  }
+}
+```
+
+Notes:
+- Rates are returned as decimal ratios, not percentages.
+- The endpoint uses telemetry events stored in Cosmos DB plus current provider/location/program/session counts.
+- `dailyActiveUsers` uses unique `userId` when present and falls back to anonymous `sessionId`.
 
 ## Dependency Injection
 

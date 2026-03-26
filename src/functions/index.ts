@@ -13,5 +13,6 @@ import './search-api/search';
 import './search-api/session-details';
 import './search-api/cities';
 import './telemetry-api/events';
+import './admin-api/city-stats';
 
 console.log('[Functions] All endpoints registered');
