@@ -38,7 +38,8 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Staging `/api/cities`: `success`, NYC present, `availableSessionCount: 10`
 - Staging `POST /api/search`: `success`, `total: 10`
 - Staging `GET /api/sessions/{id}?cityId=nyc`: `success` for `nyc-session-40425724-5`
-- Current user-visible blocker: staging is usable and deterministic, but transit remains heuristic/fallback-based until the external NYC router is deployed and wired
+- Browser-provided origin override: shipped on `main`; Times Square remains the fallback when permission is denied or unavailable
+- Current user-visible blocker: staging is usable and deterministic, but telemetry is still not wired end to end and transit UI still needs broader regression coverage
 
 ---
 
@@ -52,7 +53,7 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Likely next need:
   - keep non-zero NYC search results stable in staging
   - believable transit estimates from a concrete origin
-  - eventual parent-provided origin instead of default-only routing
+  - trustworthy instrumentation and regression coverage around browser-provided origin and transit estimates
 - Confidence level: `Moderate`
 
 Note:
@@ -71,7 +72,7 @@ Note:
   - NYC transit provider boundary in `docs/architecture/TRANSIT-ROUTER-CONTRACT.md`
 - Product/story contracts touched:
   - NYC is the deterministic first path
-  - default transit origin is Times Square until parent location input exists
+  - default transit origin is Times Square, with optional browser-provided override
   - transit enrichment applies to top 10 search results
 - Technical contracts touched:
   - `src/core/contracts/services.ts`
@@ -98,9 +99,9 @@ Current gaps:
 | Define transit-router operational contract | Platform Agent | Document OTP endpoint shape, hosting, timeout, graph build cadence, feed inputs, and required env vars | None | technical, deployment | parent, operator | Done | Yes |
 | Deploy schedule-based NYC transit router | Platform Agent | Provision router service and set `TRANSIT_ROUTER_GRAPHQL_URL` for staging | transit-router operational contract | deployment, env, transit service | parent, operator | Not blocked | No |
 | Add transit smoke and integration coverage | QA/Backend Agent | Cover top-10 enrichment, session-details travel time, fallback path, and keep staging smoke aligned with the seeded NYC path | seeded dataset; router for live-path assertions | workflow, technical, deployment | parent, operator | Partially blocked | No |
-| Reconcile workflow/docs to current transit behavior | Docs Agent | Update architecture docs to match Times Square default origin, top-10 enrichment, and router fallback | None | workflow, deployment, technical | parent, operator | Not blocked | Yes |
+| Reconcile workflow/docs to current transit behavior | Docs Agent | Update architecture docs to match Times Square fallback, browser override, top-10 enrichment, and router fallback | None | workflow, deployment, technical | parent, operator | Not blocked | Yes |
 | Close telemetry loop | Full-stack Agent | Implement `/api/events` and wire frontend telemetry end to end | None | API, telemetry service | operator | Not blocked | Yes |
-| Add parent-supplied location input | Frontend Agent | Allow parent location override and use it as routing origin | seeded data preferred | workflow, product/story, API | parent | Not blocked | Yes |
+| Harden browser-provided origin flow | Frontend Agent | Keep browser geolocation opt-in, fallback-safe, and clearly explained in the UI | seeded data preferred | workflow, product/story, API | parent | In progress | Yes |
 
 ---
 
@@ -116,7 +117,7 @@ Scoring formula:
 | 410 | Reconcile workflow and deployment docs | Current docs underdescribe actual system behavior | Keeps future agents aligned | Prevents follow-on work from targeting stale assumptions | High | Run in parallel |
 | 395 | Add transit smoke/integration coverage | Transit behavior can regress silently | Preserves parent trust | Seeded data now exists; live router assertions still depend on router | High | Start now, extend after router |
 | 280 | Close telemetry loop | Search and transit behavior are not measurable end to end | Improves operator visibility | Not on critical path for parent MVP | Medium | Follow-up |
-| 400 | Add parent-supplied location input | Likely next parent need after default-origin MVP | Makes routing personal instead of generic | Better once data and router exist | Medium | Queue after router decision |
+| 360 | Harden browser-provided origin flow | The parent can now move beyond Times Square, but the UX needs regression protection | Makes routing personal instead of generic | Depends on the shipped frontend path staying aligned with search/session details | Medium | Land now, then cover with regression tests |
 
 ---
 
@@ -129,7 +130,7 @@ Scoring formula:
   - `TRANSIT_ROUTER_GRAPHQL_URL`
   - `TRANSIT_ROUTER_TIMEOUT_MS`
 - Search transit enrichment is limited to top 10 results
-- NYC default transit origin is the city default center, currently Times Square
+- NYC default transit origin is the city default center, currently Times Square, with optional browser override in the web app
 
 ### Open Persona Change Requests
 

@@ -3,6 +3,7 @@ import telemetry from './telemetry.js';
 const API_BASE = window.SWIM_API_BASE_URL || '/api';
 const DEFAULT_TRANSIT_ORIGIN_LABEL = 'Times Square';
 const DEFAULT_TRANSIT_ORIGIN = { latitude: 40.758, longitude: -73.9855 };
+const BROWSER_TRANSIT_ORIGIN_LABEL = 'your current location';
 
 const DAY_OPTIONS = [
   { value: 0, label: 'Sun' },
@@ -154,10 +155,19 @@ const state = {
   selectedDays: new Set(),
   cities: [],
   results: [],
+  routingOrigin: DEFAULT_TRANSIT_ORIGIN,
+  routingOriginLabel: DEFAULT_TRANSIT_ORIGIN_LABEL,
+  routingOriginSource: 'default',
+  locationRequestPending: false,
+  locationError: '',
 };
 
 const elements = {
   apiStatus: document.getElementById('api-status'),
+  travelNote: document.getElementById('travel-note'),
+  originStatus: document.getElementById('origin-status'),
+  useBrowserLocation: document.getElementById('use-browser-location'),
+  resetOrigin: document.getElementById('reset-origin'),
   cityId: document.getElementById('city-id'),
   childAge: document.getElementById('child-age'),
   dayChips: document.getElementById('day-chips'),
@@ -181,6 +191,7 @@ init().catch((error) => {
 
 async function init() {
   renderDayChips();
+  setupOriginControls();
   elements.form.addEventListener('submit', handleSearch);
   await detectApiMode();
 
@@ -188,6 +199,185 @@ async function init() {
   telemetry.trackPageLoaded(state.mode);
 
   await handleSearch();
+}
+
+function setupOriginControls() {
+  if (elements.useBrowserLocation) {
+    elements.useBrowserLocation.addEventListener('click', handleUseBrowserLocation);
+  }
+
+  if (elements.resetOrigin) {
+    elements.resetOrigin.addEventListener('click', handleResetOrigin);
+  }
+
+  renderOriginControls();
+}
+
+function browserLocationSupported() {
+  return typeof navigator !== 'undefined' && 'geolocation' in navigator;
+}
+
+function hasBrowserRoutingOrigin() {
+  return state.routingOriginSource === 'browser';
+}
+
+function getRoutingOrigin() {
+  return state.routingOrigin || DEFAULT_TRANSIT_ORIGIN;
+}
+
+function getRoutingOriginLabel() {
+  return state.routingOriginLabel || DEFAULT_TRANSIT_ORIGIN_LABEL;
+}
+
+function renderOriginControls() {
+  const geolocationSupported = browserLocationSupported();
+  const usingBrowserLocation = hasBrowserRoutingOrigin();
+
+  if (elements.travelNote) {
+    elements.travelNote.textContent = usingBrowserLocation
+      ? 'Travel times are using your browser-provided location for this session.'
+      : 'Travel times default to Times Square until you ask the browser for your current location.';
+  }
+
+  if (elements.useBrowserLocation) {
+    elements.useBrowserLocation.disabled = !geolocationSupported || state.locationRequestPending;
+    elements.useBrowserLocation.textContent = state.locationRequestPending
+      ? 'Requesting location...'
+      : usingBrowserLocation
+        ? 'Refresh browser location'
+        : 'Use browser location';
+  }
+
+  if (elements.resetOrigin) {
+    elements.resetOrigin.hidden = !usingBrowserLocation;
+    elements.resetOrigin.disabled = state.locationRequestPending;
+  }
+
+  if (!elements.originStatus) {
+    return;
+  }
+
+  if (!geolocationSupported) {
+    elements.originStatus.className = 'origin-status origin-status-error';
+    elements.originStatus.textContent =
+      'Browser location is unavailable here, so travel times will keep using Times Square.';
+    return;
+  }
+
+  if (state.locationRequestPending) {
+    elements.originStatus.className = 'origin-status origin-status-default';
+    elements.originStatus.textContent =
+      'Waiting for the browser to confirm your location permission.';
+    return;
+  }
+
+  if (usingBrowserLocation) {
+    elements.originStatus.className = 'origin-status origin-status-browser';
+    elements.originStatus.textContent =
+      'Using your current location for travel times. This only affects this browser session.';
+    return;
+  }
+
+  if (state.locationError) {
+    elements.originStatus.className = 'origin-status origin-status-error';
+    elements.originStatus.textContent = state.locationError;
+    return;
+  }
+
+  elements.originStatus.className = 'origin-status origin-status-default';
+  elements.originStatus.textContent =
+    'Using Times Square as the travel-time starting point until you choose browser location.';
+}
+
+async function handleUseBrowserLocation() {
+  if (!browserLocationSupported()) {
+    state.locationError =
+      'Browser location is unavailable here, so travel times will keep using Times Square.';
+    renderOriginControls();
+    return;
+  }
+
+  const hadBrowserOrigin = hasBrowserRoutingOrigin();
+  state.locationRequestPending = true;
+  state.locationError = '';
+  renderOriginControls();
+
+  try {
+    const position = await requestBrowserLocation();
+    state.routingOrigin = {
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+    };
+    state.routingOriginLabel = BROWSER_TRANSIT_ORIGIN_LABEL;
+    state.routingOriginSource = 'browser';
+    telemetry.trackGeolocationGranted();
+    renderOriginControls();
+    await handleSearch();
+  } catch (error) {
+    const reason = getGeolocationErrorReason(error);
+    state.routingOrigin = DEFAULT_TRANSIT_ORIGIN;
+    state.routingOriginLabel = DEFAULT_TRANSIT_ORIGIN_LABEL;
+    state.routingOriginSource = 'default';
+    state.locationError = getGeolocationErrorMessage(reason);
+    telemetry.trackGeolocationDenied(reason);
+    renderOriginControls();
+    if (hadBrowserOrigin) {
+      await handleSearch();
+    }
+  } finally {
+    state.locationRequestPending = false;
+    renderOriginControls();
+  }
+}
+
+async function handleResetOrigin() {
+  state.routingOrigin = DEFAULT_TRANSIT_ORIGIN;
+  state.routingOriginLabel = DEFAULT_TRANSIT_ORIGIN_LABEL;
+  state.routingOriginSource = 'default';
+  state.locationError = '';
+  renderOriginControls();
+  await handleSearch();
+}
+
+function requestBrowserLocation() {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: false,
+      timeout: 10000,
+      maximumAge: 300000,
+    });
+  });
+}
+
+function getGeolocationErrorReason(error) {
+  if (!error || typeof error !== 'object') {
+    return 'unknown';
+  }
+
+  if (error.code === 1) {
+    return 'permission_denied';
+  }
+  if (error.code === 2) {
+    return 'position_unavailable';
+  }
+  if (error.code === 3) {
+    return 'timeout';
+  }
+
+  return 'unknown';
+}
+
+function getGeolocationErrorMessage(reason) {
+  switch (reason) {
+    case 'permission_denied':
+      return 'Location permission was denied, so travel times are using Times Square.';
+    case 'position_unavailable':
+      return 'The browser could not determine a location, so travel times are using Times Square.';
+    case 'timeout':
+      return 'Location lookup timed out, so travel times are using Times Square.';
+    default:
+      return 'The browser could not provide a location, so travel times are using Times Square.';
+  }
 }
 
 async function detectApiMode() {
@@ -260,7 +450,11 @@ async function handleSearch(event) {
   const requestBody = buildSearchRequest();
 
   // TRACK: Search started
-  telemetry.trackSearchStarted(requestBody.filters);
+  telemetry.trackSearchStarted({
+    ...requestBody.filters,
+    origin: requestBody.userContext?.origin,
+    originSource: state.routingOriginSource,
+  });
 
   try {
     const results = state.mode === 'live' ? await searchLiveApi() : searchDemoData();
@@ -334,7 +528,7 @@ function buildSearchRequest() {
     filters.priceMax = priceMax;
   }
 
-  return {
+  const requestBody = {
     cityId: elements.cityId.value || 'nyc',
     filters,
     pagination: {
@@ -342,6 +536,14 @@ function buildSearchRequest() {
       take: 20,
     },
   };
+
+  if (hasBrowserRoutingOrigin()) {
+    requestBody.userContext = {
+      origin: getRoutingOrigin(),
+    };
+  }
+
+  return requestBody;
 }
 
 function searchDemoData() {
@@ -497,7 +699,15 @@ async function openSessionDetails(result) {
 }
 
 async function fetchSessionDetails(sessionId, cityId) {
-  const payload = await fetchApi(`/sessions/${sessionId}?cityId=${encodeURIComponent(cityId)}`);
+  const params = new URLSearchParams({
+    cityId,
+  });
+
+  if (hasBrowserRoutingOrigin()) {
+    params.set('origin', JSON.stringify(getRoutingOrigin()));
+  }
+
+  const payload = await fetchApi(`/sessions/${encodeURIComponent(sessionId)}?${params.toString()}`);
   if (!payload?.data?.session) {
     throw new Error('Session details were not returned');
   }
@@ -509,6 +719,7 @@ function createDemoSessionDetails(sessionId) {
   if (!session) {
     throw new Error(`Unknown demo session: ${sessionId}`);
   }
+  const travelEstimate = estimateDemoTransit(session);
 
   const relatedSessions = demoStore.sessions
     .filter((item) => item.id !== sessionId && item.providerId === session.providerId)
@@ -542,6 +753,10 @@ function createDemoSessionDetails(sessionId) {
       skillLevel: session.skillLevel,
     },
     relatedSessions,
+    travelTime: {
+      ...travelEstimate.travelTime,
+      distance: travelEstimate.distance,
+    },
   };
 }
 
@@ -636,7 +851,7 @@ async function fetchApi(path, init = {}) {
 }
 
 function estimateDemoTransit(session) {
-  const distance = calculateHaversineDistance(DEFAULT_TRANSIT_ORIGIN, session.coordinates);
+  const distance = calculateHaversineDistance(getRoutingOrigin(), session.coordinates);
   const departureHour = Number((session.timeOfDay?.start || '12:00').split(':')[0] || '12');
   const isWeekend = (session.daysOfWeek || []).every((day) => day === 0 || day === 6);
 
@@ -768,7 +983,7 @@ function formatTravelDetail(travelTime) {
     : '';
   return `Approx. ${travelTime.minutes} min by ${formatTransitMode(
     travelTime.mode
-  )} from ${DEFAULT_TRANSIT_ORIGIN_LABEL}${distanceSuffix}.`;
+  )} from ${getRoutingOriginLabel()}${distanceSuffix}.`;
 }
 
 function formatTransitMode(mode) {

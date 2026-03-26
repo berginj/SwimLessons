@@ -23,9 +23,22 @@
             <h2>Search</h2>
             <span id="api-status" class="status-pill status-pending">Checking API</span>
           </div>
-          <p class="travel-note">
-            Travel times currently default to Times Square so every family sees a concrete NYC route estimate.
-          </p>
+          <div class="travel-origin-card">
+            <p id="travel-note" class="travel-note">
+              Travel times default to Times Square until you ask the browser for your current location.
+            </p>
+            <div class="origin-controls">
+              <button id="use-browser-location" class="secondary-button" type="button">
+                Use browser location
+              </button>
+              <button id="reset-origin" class="ghost-button" type="button" hidden>
+                Use Times Square instead
+              </button>
+            </div>
+            <p id="origin-status" class="origin-status origin-status-default">
+              Using Times Square as the travel-time starting point.
+            </p>
+          </div>
 
           <form id="search-form" class="filters">
             <label class="field">
