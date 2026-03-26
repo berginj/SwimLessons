@@ -81,6 +81,12 @@ async function validateCiWorkflow() {
     "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'",
     '.github/workflows/ci-build.yml must opt JavaScript actions into Node 24'
   );
+
+  assertContains(
+    workflow,
+    "- name: Upload test coverage\n        uses: codecov/codecov-action@v5\n        if: always()\n        env:\n          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'",
+    '.github/workflows/ci-build.yml must force the Codecov step onto Node 24'
+  );
 }
 
 async function validateWorkflow(env) {

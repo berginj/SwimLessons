@@ -49,6 +49,8 @@ jobs:
       - name: Upload test coverage
         uses: codecov/codecov-action@v5
         if: always()
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
         with:
           files: ./coverage/lcov.info
           flags: unittests
