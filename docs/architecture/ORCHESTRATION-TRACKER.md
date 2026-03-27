@@ -1,7 +1,7 @@
 # Orchestration Tracker
 
 **Purpose:** Canonical pullable handoff for agents working on the NYC MVP
-**Last Updated:** 2026-03-26
+**Last Updated:** 2026-03-27
 **Status:** Active
 
 ---
@@ -33,8 +33,8 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Repo agent guidance: `AGENTS.md`
 - Parent persona contract: `docs/architecture/PARENT-PERSONA.md`
 - Transit-router contract: `docs/architecture/TRANSIT-ROUTER-CONTRACT.md`
-- Latest verified CI run: `23620716715` `CI Build` `success`
-- Latest verified staging deploy: `23620716694` `Deploy to Staging` `success`
+- Latest verified CI run: `23624500711` `CI Build` `success`
+- Latest verified staging deploy: `23624500695` `Deploy to Staging` `success`
 - Staging site: `https://ambitious-mud-07c32a410.1.azurestaticapps.net/`
 - Staging `/api/cities`: `success`, NYC present, `availableSessionCount: 10`
 - Staging `POST /api/search`: `success`, `total: 10`
@@ -47,7 +47,7 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Browser-origin regression coverage: Playwright covers granted-location propagation, denial fallback, reset-to-Times-Square behavior, and telemetry payload shape
 - Router-backed transit assertion: now part of the staging smoke contract and workflow path, with router settings restored from the live staging container before smoke
 - Parent-facing travel copy now distinguishes live route, schedule-based estimate, and fallback estimate so transit confidence is explicit in both search results and session details
-- Current user-visible blocker: none critical in staging; the next quality gaps are keeping browser-origin coverage aligned with UI changes and deciding whether operators eventually need a hosted dashboard beyond the local runbook and report
+- Current user-visible blocker: none critical in staging; the next meaningful gaps are search-quality integrity, richer parent-facing session clarity, and keeping browser-origin coverage aligned with UI changes
 
 ---
 
@@ -93,7 +93,8 @@ Note:
   - Function App app settings for transit router
 
 Current gaps:
-- the operator runbook now includes a local HTML dashboard report, but there is still no hosted operator UI if product learning eventually needs a shared dashboard
+- search-service still uses placeholder age eligibility instead of real program age matching
+- search quality scoring still uses session confidence as a proxy instead of richer provider/program signals
 - the remaining architecture summary docs still need periodic spot-checks so they do not drift back toward planning-era assumptions
 
 ---
@@ -102,9 +103,10 @@ Current gaps:
 
 | Task Name | Owner Agent | PR-Sized Scope | Dependencies | Contracts Touched | Personas Touched | Blocker Status | Parallelizable |
 |-----------|-------------|----------------|--------------|-------------------|------------------|----------------|----------------|
+| Implement real age eligibility filtering | Backend Agent | Replace placeholder child-age matching with program-backed eligibility in search | none beyond current repositories/program data | product/story, search service, API behavior | parent | Not blocked | Yes |
 | Keep deterministic NYC seed + smoke path stable | Data/Platform Agent | Maintain repo-owned seed and smoke behavior across staging deploys | None | product/story, repository, staging smoke path, deployment | parent, operator | Not blocked | Yes |
 | Extend browser-origin regression coverage as UI evolves | Frontend/QA Agent | Keep granted, denied, and reset browser-origin paths covered as the search UI changes | None | workflow, product/story, API, browser test harness | parent | Not blocked | Yes |
-| Evaluate hosted operator dashboard need | Full-stack/Product Agent | Decide whether the new local dashboard report is sufficient or whether operators need a shared hosted dashboard | protected city stats endpoint, operator runbook, local dashboard report | API, telemetry service, operator workflows | operator | Not blocked | Yes |
+| Reconcile search request/session context contract | Backend/Frontend Agent | Align `SearchRequest.userContext` contract with actual browser behavior or implement the missing session context field | API contract review | API, telemetry, browser request wiring | parent, operator | Not blocked | Yes |
 
 ---
 
@@ -115,9 +117,10 @@ Scoring formula:
 
 | Priority Score | Item | Why It Matters Now | User/Persona Value | Dependency Rationale | Drift Risk | Execution Recommendation |
 |----------------|------|--------------------|--------------------|----------------------|------------|--------------------------|
+| 420 | Implement real age eligibility filtering | The search flow promises age-fit results, but the current service still accepts every age | Directly improves result trust for parents | Unblocks honest child-age filtering and future result-quality work | High | Next |
 | 360 | Keep deterministic NYC seed + smoke path stable | The seeded data and smoke path are now required deployment behavior | Preserves a working parent journey | Protects staging honesty and repeatability | Medium | Ongoing |
 | 345 | Keep browser-origin regression coverage current | The current flow is covered, but UI changes can easily break origin behavior again | Keeps the parent-facing geolocation flow trustworthy | Builds directly on the shipped Playwright harness | Medium | Ongoing |
-| 260 | Decide whether the local operator dashboard should become a hosted shared surface | Operators now have both a CLI/runbook and a richer local HTML report | Improves operational learning if a shared view becomes necessary | Follows the new operator tooling baseline | Medium | Follow-up |
+| 305 | Reconcile search request/session context contract | The API contract still implies browser session context that the current app does not send | Reduces contract drift and telemetry ambiguity | Prevents backend/frontend divergence as search evolves | Medium | Follow-up |
 
 ---
 
@@ -151,6 +154,8 @@ Scoring formula:
 - The operator telemetry follow-up now has a query surface instead of only raw event ingestion
 - The operator telemetry query surface now also has a repo-owned CLI/runbook consumer
 - The operator telemetry query surface now also has a repo-owned local HTML dashboard generator
+- Operator tooling is now considered sufficient for MVP; do not treat a hosted dashboard as an active backlog item without new user direction
+- Parent-facing travel copy now distinguishes live route, schedule-based estimate, and fallback estimate so transit confidence is explicit in both search results and session details
 - `integration-flows.md`, `CONTRACT-SUMMARY.md`, and `README.md` were trimmed to stop presenting deferred onboarding/data-sync flows as live NYC MVP truth
 
 ### Workflow/Code Areas Requiring Re-Review
@@ -167,15 +172,15 @@ Scoring formula:
 
 ## F. Next Recommended Tasks
 
-1. Decide whether the local operator dashboard should become a hosted shared surface
-   - Why next: operators now have both a working CLI/runbook and a local HTML dashboard, so the next question is whether a shared hosted view is actually needed
-   - Unblocks: a more explicit operator workflow only if product learning or collaboration pressure grows
-   - Risk reduced: overbuilding operator UX before there is a real need
+1. Implement real age eligibility filtering
+   - Why next: the current search service still treats child-age filtering as a placeholder, which undercuts a core parent decision signal
+   - Unblocks: honest age-fit filtering, better search trust, and future result-ranking refinement
+   - Risk reduced: parents seeing lessons that do not actually fit their child
 
-2. Keep browser-origin regression coverage aligned with future UI changes
-   - Why next: the denial/reset path is now covered and should stay covered
-   - Unblocks: safer UI iteration on search and location controls
-   - Risk reduced: regression of parent trust around geolocation behavior
+2. Reconcile the search request/session context contract
+   - Why next: `SearchRequest.userContext` and the browser request shape are drifting, which is a contract-integrity problem even if the current implementation works
+   - Unblocks: cleaner telemetry/search coupling and safer API evolution
+   - Risk reduced: hidden frontend/backend mismatch
 
 3. Keep deterministic NYC seed + smoke behavior stable as staging evolves
    - Why next: the current MVP promise depends on seeded data and router-backed smoke remaining intact
