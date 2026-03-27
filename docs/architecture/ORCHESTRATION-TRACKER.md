@@ -46,6 +46,7 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Browser-provided origin override: shipped on `main`; Times Square remains the fallback when permission is denied or unavailable
 - Browser-origin regression coverage: Playwright covers granted-location propagation, denial fallback, reset-to-Times-Square behavior, and telemetry payload shape
 - Router-backed transit assertion: now part of the staging smoke contract and workflow path, with router settings restored from the live staging container before smoke
+- Parent-facing travel copy now distinguishes live route, schedule-based estimate, and fallback estimate so transit confidence is explicit in both search results and session details
 - Current user-visible blocker: none critical in staging; the next quality gaps are keeping browser-origin coverage aligned with UI changes and deciding whether operators eventually need a hosted dashboard beyond the local runbook and report
 
 ---
@@ -133,6 +134,7 @@ Scoring formula:
 - `POST /api/events` is now part of the active Function surface and staging smoke path
 - Frontend telemetry events use a contract-compliant `properties` envelope, with backend compatibility for older flat payloads
 - `GET /api/operator/cities/{cityId}/stats` is the first operator-facing read-only telemetry summary surface and uses Function auth
+- Session details travel-time payload now includes confidence, and the UI must keep transit confidence explicit instead of implying live precision
 
 ### Open Persona Change Requests
 

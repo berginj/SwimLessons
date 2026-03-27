@@ -974,14 +974,16 @@ function calculateHaversineDistance(origin, destination) {
 
 function formatTravelSummary(travelTime, distance) {
   const distanceSuffix = Number.isFinite(distance) ? ` · ${distance.toFixed(1)} mi` : '';
-  return `~${travelTime.minutes} min by ${formatTransitMode(travelTime.mode)}${distanceSuffix}`;
+  return `~${travelTime.minutes} min by ${formatTransitMode(travelTime.mode)}${distanceSuffix} · ${formatTravelConfidenceLabel(
+    travelTime.confidence
+  )}`;
 }
 
 function formatTravelDetail(travelTime) {
   const distanceSuffix = Number.isFinite(travelTime.distance)
     ? ` for about ${travelTime.distance.toFixed(1)} miles`
     : '';
-  return `Approx. ${travelTime.minutes} min by ${formatTransitMode(
+  return `${formatTravelConfidenceSentence(travelTime.confidence)} ${travelTime.minutes} min by ${formatTransitMode(
     travelTime.mode
   )} from ${getRoutingOriginLabel()}${distanceSuffix}.`;
 }
@@ -997,6 +999,26 @@ function formatTransitMode(mode) {
     return 'walking';
   }
   return mode || 'transit';
+}
+
+function formatTravelConfidenceLabel(confidence) {
+  if (confidence === 'realtime') {
+    return 'live route';
+  }
+  if (confidence === 'estimated') {
+    return 'schedule-based';
+  }
+  return 'fallback estimate';
+}
+
+function formatTravelConfidenceSentence(confidence) {
+  if (confidence === 'realtime') {
+    return 'Live route:';
+  }
+  if (confidence === 'estimated') {
+    return 'Schedule-based estimate:';
+  }
+  return 'Fallback estimate:';
 }
 
 function formatDays(days) {

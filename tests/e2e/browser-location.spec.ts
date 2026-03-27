@@ -69,6 +69,7 @@ const sessionDetails = {
     minutes: 17,
     mode: 'subway',
     distance: 4.1,
+    confidence: 'estimated',
   },
 };
 
@@ -198,7 +199,12 @@ test.describe('browser location transit regression', () => {
       await page.getByRole('button', { name: 'View details' }).click();
 
       await expect(
-        page.getByText('Approx. 17 min by subway from your current location for about 4.1 miles.')
+        page.getByText(
+          'Schedule-based estimate: 17 min by subway from your current location for about 4.1 miles.'
+        )
+      ).toBeVisible();
+      await expect(
+        page.getByText('~17 min by subway · 4.1 mi · schedule-based')
       ).toBeVisible();
 
       await expect

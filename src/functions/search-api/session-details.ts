@@ -222,6 +222,7 @@ export async function sessionDetails(
             minutes: travelEstimate.durationMinutes,
             mode: travelEstimate.mode,
             distance: travelEstimate.distance,
+            confidence: travelEstimate.confidence,
           }
         : undefined,
     };

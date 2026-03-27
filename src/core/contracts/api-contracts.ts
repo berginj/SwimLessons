@@ -179,6 +179,7 @@ export interface SessionDetailsResponse {
     minutes: number;
     mode: string;
     distance: number;
+    confidence: 'realtime' | 'estimated' | 'fallback';
   };
 }
 

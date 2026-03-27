@@ -128,7 +128,8 @@ GET /api/sessions/session-123?cityId=nyc&origin={"latitude":40.7128,"longitude":
     "travelTime": {
       "minutes": 15,
       "mode": "transit",
-      "distance": 1.5
+      "distance": 1.5,
+      "confidence": "estimated"
     }
   },
   "metadata": { ... }
