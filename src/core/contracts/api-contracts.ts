@@ -149,6 +149,8 @@ export interface SessionSearchResult {
     name: string;
     description?: string;
     skillLevel: string;
+    ageMin?: number;
+    ageMax?: number;
   };
 
   // Search metadata

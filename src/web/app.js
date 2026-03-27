@@ -49,6 +49,8 @@ const demoStore = {
       registrationUrl: 'https://www.nycgovparks.org/programs/swimming',
       programDescription: 'A low-friction beginner class for kids who are getting comfortable in the water.',
       skillLevel: 'beginner',
+      programAgeMin: 48,
+      programAgeMax: 96,
       distanceLabel: 'LES',
       coordinates: { latitude: 40.718, longitude: -73.9839 },
       providerId: 'nyc-provider-nycparks',
@@ -72,6 +74,8 @@ const demoStore = {
       registrationUrl: 'https://ymcanyc.org/',
       programDescription: 'Weekend preschool sessions designed for parents who need a consistent Saturday slot.',
       skillLevel: 'beginner',
+      programAgeMin: 36,
+      programAgeMax: 60,
       distanceLabel: 'Park Slope',
       coordinates: { latitude: 40.6687, longitude: -73.9804 },
       providerId: 'nyc-provider-ymca',
@@ -95,6 +99,8 @@ const demoStore = {
       registrationUrl: 'https://mmjccm.org/',
       programDescription: 'A stronger stroke-development track for kids ready to move beyond basics.',
       skillLevel: 'intermediate',
+      programAgeMin: 72,
+      programAgeMax: 120,
       distanceLabel: 'Upper West Side',
       coordinates: { latitude: 40.7817, longitude: -73.9818 },
       providerId: 'nyc-provider-jcc',
@@ -118,6 +124,8 @@ const demoStore = {
       registrationUrl: 'https://www.asphaltgreen.org/',
       programDescription: 'Evening lane work for older kids building stamina and technique.',
       skillLevel: 'advanced',
+      programAgeMin: 96,
+      programAgeMax: 144,
       distanceLabel: 'Upper East Side',
       coordinates: { latitude: 40.7796, longitude: -73.9448 },
       providerId: 'nyc-provider-asphalt-green',
@@ -141,6 +149,8 @@ const demoStore = {
       registrationUrl: 'https://example.com/elite-swim',
       programDescription: 'A family-friendly starter class with smaller groups and gentler pacing.',
       skillLevel: 'beginner',
+      programAgeMin: 36,
+      programAgeMax: 72,
       distanceLabel: 'Astoria',
       coordinates: { latitude: 40.7644, longitude: -73.9169 },
       providerId: 'nyc-provider-elite',
@@ -155,6 +165,7 @@ const state = {
   selectedDays: new Set(),
   cities: [],
   results: [],
+  activeChildAgeMonths: null,
   routingOrigin: DEFAULT_TRANSIT_ORIGIN,
   routingOriginLabel: DEFAULT_TRANSIT_ORIGIN_LABEL,
   routingOriginSource: 'default',
@@ -448,6 +459,7 @@ async function handleSearch(event) {
 
   // Build filters for tracking
   const requestBody = buildSearchRequest();
+  state.activeChildAgeMonths = requestBody.filters.childAge ?? null;
 
   // TRACK: Search started
   telemetry.trackSearchStarted({
@@ -578,10 +590,8 @@ function searchDemoData() {
         return false;
       }
 
-      if (Number.isFinite(childAge) && childAge > 0) {
-        if (session.skillLevel === 'advanced' && childAge < 84) {
-          return false;
-        }
+      if (Number.isFinite(childAge) && childAge > 0 && !isAgeEligibleForSession(session, childAge)) {
+        return false;
       }
 
       return true;
@@ -626,6 +636,8 @@ function createDemoSearchResult(session) {
       name: session.programName,
       description: session.programDescription,
       skillLevel: session.skillLevel,
+      ageMin: session.programAgeMin,
+      ageMax: session.programAgeMax,
     },
   };
 }
@@ -636,12 +648,23 @@ function renderResults(results) {
     return;
   }
 
-  elements.summary.textContent = `${results.length} session${results.length === 1 ? '' : 's'} found`;
+  const ageContext = formatChildAgeContext(state.activeChildAgeMonths);
+  elements.summary.textContent = `${results.length} session${results.length === 1 ? '' : 's'} found${
+    ageContext ? ` for ${ageContext}` : ''
+  }`;
   elements.results.innerHTML = '';
 
-  for (const result of results) {
+  results.forEach((result, index) => {
     const travelSummary = result.travelTime
       ? `<span class="travel-badge">${escapeHtml(formatTravelSummary(result.travelTime, result.distance))}</span>`
+      : '';
+    const ageRange = formatAgeRange(result.program);
+    const ageFit = formatAgeFitSummary(result.program, state.activeChildAgeMonths);
+    const ageSummary = ageRange
+      ? `<div class="result-age">
+          <span class="age-badge">${escapeHtml(ageRange)}</span>
+          <span class="age-fit-note">${escapeHtml(ageFit)}</span>
+        </div>`
       : '';
 
     const card = document.createElement('article');
@@ -663,20 +686,20 @@ function renderResults(results) {
         <span>${formatDateRange(result.session?.startDate, result.session?.endDate)}</span>
         ${travelSummary}
       </div>
+      ${ageSummary}
       <div class="result-footer">
         <span class="availability-badge">${formatAvailability(result.session?.availableSpots)}</span>
         <button class="secondary-button" type="button">View details</button>
       </div>
     `;
 
-    const cardIndex = results.indexOf(result);
     card.querySelector('button').addEventListener('click', () => {
       // TRACK: Session viewed (user clicked to see details)
-      telemetry.trackSessionViewed(result.session, cardIndex + 1, result.distance);
+      telemetry.trackSessionViewed(result.session, index + 1, result.distance);
       openSessionDetails(result);
     });
     elements.results.appendChild(card);
-  }
+  });
 }
 
 function renderEmptyState(message) {
@@ -751,6 +774,8 @@ function createDemoSessionDetails(sessionId) {
       name: session.programName,
       description: session.programDescription,
       skillLevel: session.skillLevel,
+      ageMin: session.programAgeMin,
+      ageMax: session.programAgeMax,
     },
     relatedSessions,
     travelTime: {
@@ -777,10 +802,19 @@ function renderDialog(details) {
     : '<p>No related upcoming sessions.</p>';
 
   const registrationUrl = details.session?.registrationUrl || 'https://example.com/';
+  const ageRange = formatAgeRange(details.program);
+  const ageFit = formatAgeFitSummary(details.program, state.activeChildAgeMonths);
   const travelBlock = details.travelTime
     ? `<div class="detail-block">
         <h3>Travel</h3>
         <p>${escapeHtml(formatTravelDetail(details.travelTime))}</p>
+      </div>`
+    : '';
+  const ageBlock = ageRange
+    ? `<div class="detail-block">
+        <h3>Age fit</h3>
+        <p class="detail-age-range">${escapeHtml(ageRange)}</p>
+        <p class="detail-age-fit">${escapeHtml(ageFit)}</p>
       </div>`
     : '';
 
@@ -790,6 +824,7 @@ function renderDialog(details) {
         <h2>${escapeHtml(details.program?.name || 'Session details')}</h2>
         <p>${escapeHtml(details.program?.description || 'Detailed session information is available through the linked provider.')}</p>
       </div>
+      ${ageBlock}
       <div class="detail-block">
         <h3>Provider</h3>
         <p>${escapeHtml(details.provider?.name || 'Unknown provider')}</p>
@@ -892,6 +927,25 @@ function estimateDemoTransit(session) {
       confidence: 'estimated',
     },
   };
+}
+
+function isAgeEligibleForSession(session, childAgeMonths) {
+  const min = Number(session?.programAgeMin);
+  const max = Number(session?.programAgeMax);
+
+  if (!Number.isFinite(min) && !Number.isFinite(max)) {
+    return true;
+  }
+
+  if (Number.isFinite(min) && childAgeMonths < min) {
+    return false;
+  }
+
+  if (Number.isFinite(max) && childAgeMonths > max) {
+    return false;
+  }
+
+  return true;
 }
 
 function getDemoSubwaySpeed(hour, isWeekend) {
@@ -1019,6 +1073,93 @@ function formatTravelConfidenceSentence(confidence) {
     return 'Schedule-based estimate:';
   }
   return 'Fallback estimate:';
+}
+
+function formatAgeRange(program) {
+  const min = Number(program?.ageMin);
+  const max = Number(program?.ageMax);
+
+  if (Number.isFinite(min) && Number.isFinite(max)) {
+    return `Ages ${formatAgeSpan(min)} to ${formatAgeSpan(max)}`;
+  }
+
+  if (Number.isFinite(min)) {
+    return `Ages ${formatAgeSpan(min)}+`;
+  }
+
+  if (Number.isFinite(max)) {
+    return `Up to ${formatAgeSpan(max)}`;
+  }
+
+  return '';
+}
+
+function formatAgeFitSummary(program, childAgeMonths) {
+  const ageRange = formatAgeRange(program);
+  if (!ageRange) {
+    return 'Age range not listed by provider';
+  }
+
+  if (!Number.isFinite(childAgeMonths) || childAgeMonths <= 0) {
+    return 'Select a child age to see fit guidance';
+  }
+
+  const min = Number(program?.ageMin);
+  const max = Number(program?.ageMax);
+
+  if (Number.isFinite(min) && childAgeMonths < min) {
+    return `Usually starts at ${formatAgeSpan(min)}`;
+  }
+
+  if (Number.isFinite(max) && childAgeMonths > max) {
+    return `Usually tops out at ${formatAgeSpan(max)}`;
+  }
+
+  return `Good fit for ${formatAgeGroup(childAgeMonths)}`;
+}
+
+function formatChildAgeContext(childAgeMonths) {
+  if (!Number.isFinite(childAgeMonths) || childAgeMonths <= 0) {
+    return '';
+  }
+
+  return formatAgeGroup(childAgeMonths);
+}
+
+function formatAgeSpan(months) {
+  if (!Number.isFinite(months) || months <= 0) {
+    return '';
+  }
+
+  if (months < 12) {
+    return `${months} month${months === 1 ? '' : 's'}`;
+  }
+
+  if (months % 12 === 0) {
+    const years = months / 12;
+    return `${years} year${years === 1 ? '' : 's'}`;
+  }
+
+  const years = Math.floor(months / 12);
+  const remainingMonths = months % 12;
+  return `${years} year${years === 1 ? '' : 's'} ${remainingMonths} month${remainingMonths === 1 ? '' : 's'}`;
+}
+
+function formatAgeGroup(months) {
+  if (!Number.isFinite(months) || months <= 0) {
+    return '';
+  }
+
+  if (months < 12) {
+    return `${months}-month-olds`;
+  }
+
+  if (months % 12 === 0) {
+    const years = months / 12;
+    return `${years}-year-olds`;
+  }
+
+  return `${formatAgeSpan(months)} old`;
 }
 
 function formatDays(days) {

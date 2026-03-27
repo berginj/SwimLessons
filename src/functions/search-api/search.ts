@@ -229,6 +229,8 @@ export async function search(req: HttpRequest, context: InvocationContext): Prom
               name: program?.name || 'Swim program',
               description: program?.description,
               skillLevel: program?.skillLevel || 'all',
+              ageMin: program?.ageMin,
+              ageMax: program?.ageMax,
             },
           };
         })

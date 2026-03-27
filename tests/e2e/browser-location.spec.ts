@@ -44,6 +44,53 @@ const searchResults = [
       name: 'Morning Beginner',
       description: 'Early morning beginner session.',
       skillLevel: 'beginner',
+      ageMin: 48,
+      ageMax: 72,
+    },
+  },
+];
+
+const ageFilteredSearchResults = [
+  {
+    session: {
+      id: 'nyc-session-age-1',
+      cityId: 'nyc',
+      providerId: 'provider-1',
+      locationId: 'location-1',
+      programId: 'program-age-1',
+      startDate: '2026-06-22',
+      endDate: '2026-08-17',
+      daysOfWeek: [1, 3, 5],
+      timeOfDay: { start: '08:00', end: '09:00' },
+      availableSpots: 15,
+      registrationUrl: 'https://example.com/signup',
+      price: { amount: 70, currency: 'USD' },
+    },
+    provider: {
+      id: 'provider-1',
+      name: 'NYC Department of Education',
+      verified: true,
+    },
+    distance: 4.1,
+    travelTime: {
+      minutes: 17,
+      mode: 'subway',
+      confidence: 'estimated',
+    },
+    location: {
+      id: 'location-1',
+      name: 'George Washington H.S.',
+      address: '549 Audubon Ave, New York, NY 10040',
+      coordinates: { latitude: 40.7831, longitude: -73.9712 },
+      facilityType: 'indoor',
+    },
+    program: {
+      id: 'program-age-1',
+      name: 'School Age Beginner',
+      description: 'A beginner session matched to a school-age child.',
+      skillLevel: 'beginner',
+      ageMin: 60,
+      ageMax: 96,
     },
   },
 ];
@@ -73,7 +120,44 @@ const sessionDetails = {
   },
 };
 
-async function registerApiMocks(page, capturedSearchBodies, capturedSessionDetailOrigins, capturedTelemetryRequests) {
+const ageFilteredSessionDetails = {
+  session: ageFilteredSearchResults[0].session,
+  provider: ageFilteredSearchResults[0].provider,
+  location: {
+    id: 'location-1',
+    name: 'George Washington H.S.',
+    address: {
+      street: '549 Audubon Ave',
+      city: 'New York',
+      state: 'NY',
+      zipCode: '10040',
+    },
+    coordinates: { latitude: 40.7831, longitude: -73.9712 },
+    facilityType: 'indoor',
+  },
+  program: ageFilteredSearchResults[0].program,
+  relatedSessions: [],
+  travelTime: {
+    minutes: 17,
+    mode: 'subway',
+    distance: 4.1,
+    confidence: 'estimated',
+  },
+};
+
+async function registerApiMocks(
+  page,
+  capturedSearchBodies,
+  capturedSessionDetailOrigins,
+  capturedTelemetryRequests,
+  options: {
+    resolveSearchResults?: (requestBody: any) => typeof searchResults;
+    resolveSessionDetails?: (requestUrl: URL) => typeof sessionDetails;
+  } = {}
+) {
+  const resolveSearchResults = options.resolveSearchResults || (() => searchResults);
+  const resolveSessionDetails = options.resolveSessionDetails || (() => sessionDetails);
+
   await page.route('**/api/cities?includePreview=true', async (route) => {
     await route.fulfill({
       status: 200,
@@ -98,6 +182,7 @@ async function registerApiMocks(page, capturedSearchBodies, capturedSessionDetai
   await page.route('**/api/search', async (route) => {
     const requestBody = route.request().postDataJSON();
     capturedSearchBodies.push(requestBody);
+    const results = resolveSearchResults(requestBody);
 
     await route.fulfill({
       status: 200,
@@ -105,11 +190,11 @@ async function registerApiMocks(page, capturedSearchBodies, capturedSessionDetai
       body: JSON.stringify({
         success: true,
         data: {
-          results: searchResults,
+          results,
           pagination: {
             skip: 0,
             take: 20,
-            total: searchResults.length,
+            total: results.length,
             hasMore: false,
           },
         },
@@ -123,13 +208,14 @@ async function registerApiMocks(page, capturedSearchBodies, capturedSessionDetai
     if (origin) {
       capturedSessionDetailOrigins.push(origin);
     }
+    const details = resolveSessionDetails(requestUrl);
 
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         success: true,
-        data: sessionDetails,
+        data: details,
       }),
     });
   });
@@ -159,6 +245,58 @@ function getTelemetryEvents(capturedTelemetryRequests) {
 }
 
 test.describe('browser location transit regression', () => {
+  test('sends child age through the browser search flow', async ({ page }) => {
+    const capturedSearchBodies: any[] = [];
+    const capturedSessionDetailOrigins: string[] = [];
+    const capturedTelemetryRequests: any[] = [];
+
+    await registerApiMocks(
+      page,
+      capturedSearchBodies,
+      capturedSessionDetailOrigins,
+      capturedTelemetryRequests,
+      {
+        resolveSearchResults: (requestBody) =>
+          requestBody?.filters?.childAge === 60 ? ageFilteredSearchResults : searchResults,
+        resolveSessionDetails: () => ageFilteredSessionDetails,
+      }
+    );
+
+    await page.goto('/');
+
+    await expect(page.getByText(/Using Times Square as the travel-time starting point/i)).toBeVisible();
+    await page.getByLabel('Child age').selectOption('60');
+    await page.getByRole('button', { name: 'Search sessions' }).click();
+
+    await expect
+      .poll(() => capturedSearchBodies.length)
+      .toBeGreaterThan(1);
+
+    const latestSearchBody = capturedSearchBodies.at(-1);
+    expect(latestSearchBody?.filters?.childAge).toBe(60);
+
+    await expect(page.getByText('School Age Beginner')).toBeVisible();
+    await expect(page.getByText('1 session found for 5-year-olds')).toBeVisible();
+    await expect(page.getByText('Ages 5 years to 8 years')).toBeVisible();
+    await expect(page.getByText('Good fit for 5-year-olds')).toBeVisible();
+
+    await page.getByRole('button', { name: 'View details' }).click();
+    const dialog = page.locator('#dialog-content');
+    await expect(page.getByRole('heading', { name: 'Age fit' })).toBeVisible();
+    await expect(dialog.getByText('Ages 5 years to 8 years')).toBeVisible();
+    await expect(dialog.getByText('Good fit for 5-year-olds')).toBeVisible();
+    await page.getByRole('button', { name: 'Close' }).click();
+
+    await expect
+      .poll(() => getTelemetryEvents(capturedTelemetryRequests).length)
+      .toBeGreaterThan(0);
+
+    const latestSearchStartedEvent = [...getTelemetryEvents(capturedTelemetryRequests)]
+      .reverse()
+      .find((event) => event.eventName === 'SearchStarted');
+    expect(latestSearchStartedEvent?.properties?.filters?.childAge).toBe(60);
+  });
+
   test.describe('granted location', () => {
     test.use({
       permissions: ['geolocation'],
@@ -189,9 +327,7 @@ test.describe('browser location transit regression', () => {
       ).toBeVisible();
       await expect(page.getByRole('button', { name: 'Use Times Square instead' })).toBeVisible();
 
-      await expect
-        .poll(() => capturedSearchBodies.length)
-        .toBeGreaterThan(1);
+      await expect.poll(() => capturedSearchBodies.length).toBeGreaterThan(1);
 
       const latestSearchBody = capturedSearchBodies.at(-1);
       expect(latestSearchBody?.userContext?.origin).toEqual(browserOrigin);

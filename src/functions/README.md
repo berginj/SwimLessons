@@ -71,7 +71,14 @@ Main search endpoint for finding swim sessions.
         "session": { ... },
         "provider": { ... },
         "location": { ... },
-        "program": { ... },
+        "program": {
+          "id": "program-1",
+          "name": "Morning Beginner",
+          "description": "Early morning beginner session.",
+          "skillLevel": "beginner",
+          "ageMin": 48,
+          "ageMax": 84
+        },
         "distance": 2.5,
         "travelTime": { ... }
       }
@@ -94,6 +101,8 @@ Main search endpoint for finding swim sessions.
   }
 }
 ```
+
+The denormalized `program` object in search results includes `ageMin` and `ageMax` when available so the UI can show age-fit context without fetching session details.
 
 **Error Responses:**
 - 400 Bad Request: Invalid request format or validation failure

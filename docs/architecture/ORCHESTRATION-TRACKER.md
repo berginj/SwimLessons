@@ -44,13 +44,14 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Operator stats runbook: `npm run operator:city-stats -- --environment staging --city nyc` resolves the Function key and calls the protected city stats endpoint directly
 - Operator dashboard report: `npm run operator:city-dashboard -- --environment staging --city nyc --output tmp/operator-dashboard.html` generates a local HTML report from the same protected endpoint without exposing the Function key in the web app
 - Browser-provided origin override: shipped on `main`; Times Square remains the fallback when permission is denied or unavailable
-- Browser-origin regression coverage: Playwright covers granted-location propagation, denial fallback, reset-to-Times-Square behavior, and telemetry payload shape
+- Browser-origin regression coverage: Playwright covers granted-location propagation, denial fallback, reset-to-Times-Square behavior, child-age filter wiring, and telemetry payload shape
 - Router-backed transit assertion: now part of the staging smoke contract and workflow path, with router settings restored from the live staging container before smoke
 - Parent-facing travel copy now distinguishes live route, schedule-based estimate, and fallback estimate so transit confidence is explicit in both search results and session details
 - Real age eligibility filtering now uses program age bounds instead of a placeholder
+- Search results and session details now surface program age range and age-fit context when provider age bounds are available
 - Search quality scoring now uses provider/program/session signals instead of session confidence alone
 - `SearchRequest.userContext.sessionId` is now optional and aligned with the current browser request shape
-- Current user-visible blocker: none critical in staging; the next meaningful gaps are richer parent-facing session clarity and keeping browser-origin coverage aligned with UI changes
+- Current user-visible blocker: none critical in staging; the next meaningful gaps are richer parent-facing session clarity beyond age fit and keeping browser-origin coverage aligned with UI changes
 
 ---
 
@@ -96,8 +97,7 @@ Note:
   - Function App app settings for transit router
 
 Current gaps:
-- the parent UI still does not surface age range or age-fit context directly in result cards/details
-- browser coverage is strong for origin handling, but not yet for the child-age filter flow in the UI
+- no critical parent-visible blocker in the current NYC MVP slice; the next likely improvement is richer session/provider clarity once age fit and transit trust are in place
 - the remaining architecture summary docs still need periodic spot-checks so they do not drift back toward planning-era assumptions
 
 ---
@@ -106,10 +106,9 @@ Current gaps:
 
 | Task Name | Owner Agent | PR-Sized Scope | Dependencies | Contracts Touched | Personas Touched | Blocker Status | Parallelizable |
 |-----------|-------------|----------------|--------------|-------------------|------------------|----------------|----------------|
-| Surface age-fit context in the parent UI | Full-stack Agent | Show program age range and age-fit clarity in search results and session details | real age eligibility filtering now shipped | product/story, search UI, session details UI | parent | Not blocked | Yes |
+| Improve parent-facing session richness | Full-stack Agent | Add clearer provider, facility, and session context once age fit and transit trust are already visible | age-fit UI and honest transit copy now shipped | product/story, search UI, session details UI | parent | Not blocked | Yes |
 | Keep deterministic NYC seed + smoke path stable | Data/Platform Agent | Maintain repo-owned seed and smoke behavior across staging deploys | None | product/story, repository, staging smoke path, deployment | parent, operator | Not blocked | Yes |
 | Extend browser-origin regression coverage as UI evolves | Frontend/QA Agent | Keep granted, denied, and reset browser-origin paths covered as the search UI changes | None | workflow, product/story, API, browser test harness | parent | Not blocked | Yes |
-| Add browser regression for child-age filtering | Frontend/QA Agent | Cover child-age filtering in the browser flow so UI wiring stays honest | real age eligibility filtering now shipped | product/story, API, browser test harness | parent | Not blocked | Yes |
 
 ---
 
@@ -120,10 +119,9 @@ Scoring formula:
 
 | Priority Score | Item | Why It Matters Now | User/Persona Value | Dependency Rationale | Drift Risk | Execution Recommendation |
 |----------------|------|--------------------|--------------------|----------------------|------------|--------------------------|
-| 355 | Surface age-fit context in the parent UI | Search now filters by age correctly, but the UI still leaves parents to infer fit from titles alone | Improves trust at decision time | Builds on the shipped age-filter backend | Medium-High | Next |
+| 340 | Improve parent-facing session richness | Age fit and transit confidence are now visible, so the next improvement is richer session/provider/facility context for decision-making | Improves trust and reduces clicks into dead-end provider pages | Builds on the stabilized search, session-details, and age-fit UI | Medium | Next |
 | 360 | Keep deterministic NYC seed + smoke path stable | The seeded data and smoke path are now required deployment behavior | Preserves a working parent journey | Protects staging honesty and repeatability | Medium | Ongoing |
 | 345 | Keep browser-origin regression coverage current | The current flow is covered, but UI changes can easily break origin behavior again | Keeps the parent-facing geolocation flow trustworthy | Builds directly on the shipped Playwright harness | Medium | Ongoing |
-| 325 | Add browser regression for child-age filtering | The backend now filters correctly, but the browser flow can still drift silently | Protects parent-visible search trust | Builds on the new backend behavior and Playwright harness | Medium | Follow-up |
 
 ---
 
@@ -144,6 +142,7 @@ Scoring formula:
 - Search age filtering now depends on real program age bounds, not a placeholder
 - Search quality scoring now uses provider/program/session quality signals instead of session confidence alone
 - `SearchRequest.userContext.sessionId` is optional and no longer treated as required browser input
+- Search results now denormalize `program.ageMin` and `program.ageMax` so the web UI can show age-fit context without an extra fetch
 
 ### Open Persona Change Requests
 
@@ -178,20 +177,20 @@ Scoring formula:
 
 ## F. Next Recommended Tasks
 
-1. Surface age-fit context in the parent UI
-   - Why next: filtering is now correct, but parents still cannot see age range or fit context clearly on the cards/details
-   - Unblocks: better decision support and less ambiguity after filtering
-   - Risk reduced: correct backend behavior that is still hard for parents to trust
+1. Improve parent-facing session richness
+   - Why next: age fit and transit trust are now explicit, so the next quality gain is richer provider/facility/session context on the card and detail views
+   - Unblocks: better comparison without extra clicks and less ambiguity before leaving to provider signup
+   - Risk reduced: parents bouncing because results still feel thin even when technically correct
 
-2. Add browser regression for child-age filtering
-   - Why next: the backend and staging smoke now enforce age filtering, but the UI flow still needs direct browser coverage
-   - Unblocks: safer search-form iteration
-   - Risk reduced: frontend drift that bypasses the new backend behavior
-
-3. Keep deterministic NYC seed + smoke behavior stable as staging evolves
+2. Keep deterministic NYC seed + smoke behavior stable as staging evolves
    - Why next: the current MVP promise depends on seeded data and router-backed smoke remaining intact
    - Unblocks: safer future feature work on search, telemetry, and operator surfaces
    - Risk reduced: green deploys that drift away from usable staging
+
+3. Keep browser-origin regression coverage current as the search UI changes
+   - Why next: the browser-origin and child-age flows are now both critical parent-facing behavior
+   - Unblocks: safer iteration on search cards, filters, and session details
+   - Risk reduced: silent UI drift that breaks trusted routing or age-fit behavior
 
 ---
 
