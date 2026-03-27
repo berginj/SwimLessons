@@ -53,7 +53,6 @@ Main search endpoint for finding swim sessions.
     "take": 20
   },
   "userContext": {
-    "sessionId": "user-session-123",
     "origin": {
       "latitude": 40.7128,
       "longitude": -74.0060

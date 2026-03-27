@@ -47,7 +47,10 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Browser-origin regression coverage: Playwright covers granted-location propagation, denial fallback, reset-to-Times-Square behavior, and telemetry payload shape
 - Router-backed transit assertion: now part of the staging smoke contract and workflow path, with router settings restored from the live staging container before smoke
 - Parent-facing travel copy now distinguishes live route, schedule-based estimate, and fallback estimate so transit confidence is explicit in both search results and session details
-- Current user-visible blocker: none critical in staging; the next meaningful gaps are search-quality integrity, richer parent-facing session clarity, and keeping browser-origin coverage aligned with UI changes
+- Real age eligibility filtering now uses program age bounds instead of a placeholder
+- Search quality scoring now uses provider/program/session signals instead of session confidence alone
+- `SearchRequest.userContext.sessionId` is now optional and aligned with the current browser request shape
+- Current user-visible blocker: none critical in staging; the next meaningful gaps are richer parent-facing session clarity and keeping browser-origin coverage aligned with UI changes
 
 ---
 
@@ -93,8 +96,8 @@ Note:
   - Function App app settings for transit router
 
 Current gaps:
-- search-service still uses placeholder age eligibility instead of real program age matching
-- search quality scoring still uses session confidence as a proxy instead of richer provider/program signals
+- the parent UI still does not surface age range or age-fit context directly in result cards/details
+- browser coverage is strong for origin handling, but not yet for the child-age filter flow in the UI
 - the remaining architecture summary docs still need periodic spot-checks so they do not drift back toward planning-era assumptions
 
 ---
@@ -103,10 +106,10 @@ Current gaps:
 
 | Task Name | Owner Agent | PR-Sized Scope | Dependencies | Contracts Touched | Personas Touched | Blocker Status | Parallelizable |
 |-----------|-------------|----------------|--------------|-------------------|------------------|----------------|----------------|
-| Implement real age eligibility filtering | Backend Agent | Replace placeholder child-age matching with program-backed eligibility in search | none beyond current repositories/program data | product/story, search service, API behavior | parent | Not blocked | Yes |
+| Surface age-fit context in the parent UI | Full-stack Agent | Show program age range and age-fit clarity in search results and session details | real age eligibility filtering now shipped | product/story, search UI, session details UI | parent | Not blocked | Yes |
 | Keep deterministic NYC seed + smoke path stable | Data/Platform Agent | Maintain repo-owned seed and smoke behavior across staging deploys | None | product/story, repository, staging smoke path, deployment | parent, operator | Not blocked | Yes |
 | Extend browser-origin regression coverage as UI evolves | Frontend/QA Agent | Keep granted, denied, and reset browser-origin paths covered as the search UI changes | None | workflow, product/story, API, browser test harness | parent | Not blocked | Yes |
-| Reconcile search request/session context contract | Backend/Frontend Agent | Align `SearchRequest.userContext` contract with actual browser behavior or implement the missing session context field | API contract review | API, telemetry, browser request wiring | parent, operator | Not blocked | Yes |
+| Add browser regression for child-age filtering | Frontend/QA Agent | Cover child-age filtering in the browser flow so UI wiring stays honest | real age eligibility filtering now shipped | product/story, API, browser test harness | parent | Not blocked | Yes |
 
 ---
 
@@ -117,10 +120,10 @@ Scoring formula:
 
 | Priority Score | Item | Why It Matters Now | User/Persona Value | Dependency Rationale | Drift Risk | Execution Recommendation |
 |----------------|------|--------------------|--------------------|----------------------|------------|--------------------------|
-| 420 | Implement real age eligibility filtering | The search flow promises age-fit results, but the current service still accepts every age | Directly improves result trust for parents | Unblocks honest child-age filtering and future result-quality work | High | Next |
+| 355 | Surface age-fit context in the parent UI | Search now filters by age correctly, but the UI still leaves parents to infer fit from titles alone | Improves trust at decision time | Builds on the shipped age-filter backend | Medium-High | Next |
 | 360 | Keep deterministic NYC seed + smoke path stable | The seeded data and smoke path are now required deployment behavior | Preserves a working parent journey | Protects staging honesty and repeatability | Medium | Ongoing |
 | 345 | Keep browser-origin regression coverage current | The current flow is covered, but UI changes can easily break origin behavior again | Keeps the parent-facing geolocation flow trustworthy | Builds directly on the shipped Playwright harness | Medium | Ongoing |
-| 305 | Reconcile search request/session context contract | The API contract still implies browser session context that the current app does not send | Reduces contract drift and telemetry ambiguity | Prevents backend/frontend divergence as search evolves | Medium | Follow-up |
+| 325 | Add browser regression for child-age filtering | The backend now filters correctly, but the browser flow can still drift silently | Protects parent-visible search trust | Builds on the new backend behavior and Playwright harness | Medium | Follow-up |
 
 ---
 
@@ -138,6 +141,9 @@ Scoring formula:
 - Frontend telemetry events use a contract-compliant `properties` envelope, with backend compatibility for older flat payloads
 - `GET /api/operator/cities/{cityId}/stats` is the first operator-facing read-only telemetry summary surface and uses Function auth
 - Session details travel-time payload now includes confidence, and the UI must keep transit confidence explicit instead of implying live precision
+- Search age filtering now depends on real program age bounds, not a placeholder
+- Search quality scoring now uses provider/program/session quality signals instead of session confidence alone
+- `SearchRequest.userContext.sessionId` is optional and no longer treated as required browser input
 
 ### Open Persona Change Requests
 
@@ -172,15 +178,15 @@ Scoring formula:
 
 ## F. Next Recommended Tasks
 
-1. Implement real age eligibility filtering
-   - Why next: the current search service still treats child-age filtering as a placeholder, which undercuts a core parent decision signal
-   - Unblocks: honest age-fit filtering, better search trust, and future result-ranking refinement
-   - Risk reduced: parents seeing lessons that do not actually fit their child
+1. Surface age-fit context in the parent UI
+   - Why next: filtering is now correct, but parents still cannot see age range or fit context clearly on the cards/details
+   - Unblocks: better decision support and less ambiguity after filtering
+   - Risk reduced: correct backend behavior that is still hard for parents to trust
 
-2. Reconcile the search request/session context contract
-   - Why next: `SearchRequest.userContext` and the browser request shape are drifting, which is a contract-integrity problem even if the current implementation works
-   - Unblocks: cleaner telemetry/search coupling and safer API evolution
-   - Risk reduced: hidden frontend/backend mismatch
+2. Add browser regression for child-age filtering
+   - Why next: the backend and staging smoke now enforce age filtering, but the UI flow still needs direct browser coverage
+   - Unblocks: safer search-form iteration
+   - Risk reduced: frontend drift that bypasses the new backend behavior
 
 3. Keep deterministic NYC seed + smoke behavior stable as staging evolves
    - Why next: the current MVP promise depends on seeded data and router-backed smoke remaining intact

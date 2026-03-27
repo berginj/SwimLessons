@@ -26,6 +26,8 @@ import {
 } from '@core/contracts/city-config';
 import {
   Session,
+  Program,
+  Provider,
   SearchResults,
 } from '@core/models/canonical-schema';
 import {
@@ -74,21 +76,21 @@ export class SearchService implements ISearchService {
 
     // Phase 1: Query repository with database-level filters
     let sessions = await this.querySessions(filters, cityConfig);
-    const locationCoordinates = await this.loadLocationCoordinates(
+    const searchContext = await this.loadSearchContext(
       sessions,
       filters.cityId,
       cityConfig.defaultCenter
     );
 
     // Phase 2: Apply application-layer business filters
-    sessions = this.applyBusinessFilters(sessions, filters, cityConfig, locationCoordinates);
+    sessions = this.applyBusinessFilters(sessions, filters, cityConfig, searchContext);
 
     // Phase 3: Score and rank all sessions
     const scoredSessions = await this.scoreAndRankWithLocationContext(
       sessions,
       filters,
       cityConfig,
-      locationCoordinates
+      searchContext
     );
 
     // Phase 4: Sort by user preference
@@ -97,7 +99,7 @@ export class SearchService implements ISearchService {
       sort,
       filters.origin,
       cityConfig,
-      locationCoordinates
+      searchContext.locationCoordinates
     );
 
     // Phase 5: Check for no results and apply relaxation if needed
@@ -159,14 +161,19 @@ export class SearchService implements ISearchService {
     filters: SearchFilters,
     cityConfig: CityConfig
   ): Promise<ScoredSession[]> {
-    return this.scoreAndRankWithLocationContext(sessions, filters, cityConfig);
+    const searchContext = await this.loadSearchContext(
+      sessions,
+      filters.cityId,
+      cityConfig.defaultCenter
+    );
+    return this.scoreAndRankWithLocationContext(sessions, filters, cityConfig, searchContext);
   }
 
   private async scoreAndRankWithLocationContext(
     sessions: Session[],
     filters: SearchFilters,
     cityConfig: CityConfig,
-    locationCoordinates?: Map<string, Coordinates>
+    searchContext?: SearchContext
   ): Promise<ScoredSession[]> {
     const weights = cityConfig.searchProfile.rankingWeights;
 
@@ -177,10 +184,10 @@ export class SearchService implements ISearchService {
         session,
         filters,
         cityConfig,
-        locationCoordinates
+        searchContext?.locationCoordinates
       );
       const availabilityScore = this.calculateAvailabilityScore(session);
-      const qualityScore = this.calculateQualityScore(session);
+      const qualityScore = this.calculateQualityScore(session, searchContext);
 
       // Weighted combination
       const score =
@@ -256,12 +263,16 @@ export class SearchService implements ISearchService {
     sessions: Session[],
     filters: SearchFilters,
     cityConfig: CityConfig,
-    locationCoordinates?: Map<string, Coordinates>
+    searchContext?: SearchContext
   ): Session[] {
     return sessions.filter((session) => {
       // Age eligibility check
       if (filters.childAge !== undefined) {
-        const hasAgeEligibility = this.checkAgeEligibility(session, filters.childAge);
+        const hasAgeEligibility = this.checkAgeEligibility(
+          session,
+          filters.childAge,
+          searchContext?.programs
+        );
         if (!hasAgeEligibility) {
           return false;
         }
@@ -304,7 +315,7 @@ export class SearchService implements ISearchService {
       if (filters.origin && filters.maxTravelMinutes) {
         const distance = this.calculateHaversineDistance(
           filters.origin,
-          this.getSessionLocation(session, cityConfig, locationCoordinates)
+          this.getSessionLocation(session, cityConfig, searchContext?.locationCoordinates)
         );
         const maxTravelMiles = filters.maxTravelMinutes / 10; // Rough conversion: ~10 min per mile
         if (distance > maxTravelMiles) {
@@ -331,10 +342,32 @@ export class SearchService implements ISearchService {
    * @param childAge Child age in months
    * @returns True if age is within program range
    */
-  private checkAgeEligibility(session: Session, childAge: number): boolean {
-    // If no age constraints, assume eligible
-    // Note: Would need to fetch program from repository for detailed age checks
-    // For now, this is a placeholder - full implementation would denormalize age fields
+  private checkAgeEligibility(
+    session: Session,
+    childAge: number,
+    programs?: Map<string, Program | null>
+  ): boolean {
+    const program = programs?.get(session.programId) || null;
+
+    if (!program) {
+      return false;
+    }
+
+    const hasMin = typeof program.ageMin === 'number';
+    const hasMax = typeof program.ageMax === 'number';
+
+    if (!hasMin && !hasMax) {
+      return false;
+    }
+
+    if (hasMin && childAge < (program.ageMin || 0)) {
+      return false;
+    }
+
+    if (hasMax && childAge > (program.ageMax || Number.MAX_SAFE_INTEGER)) {
+      return false;
+    }
+
     return true;
   }
 
@@ -486,20 +519,21 @@ export class SearchService implements ISearchService {
    * @param session Session to score
    * @returns Score 0-1
    */
-  private calculateQualityScore(session: Session): number {
-    let score = 0.5; // Base score
+  private calculateQualityScore(session: Session, searchContext?: SearchContext): number {
+    const provider = searchContext?.providers.get(session.providerId) || null;
+    const program = searchContext?.programs.get(session.programId) || null;
 
-    // Would need to fetch provider to check verification status
-    // For now, use confidence level as proxy
-    if (session.confidence === 'high') {
-      score = 0.9;
-    } else if (session.confidence === 'medium') {
-      score = 0.7;
-    } else if (session.confidence === 'low') {
-      score = 0.4;
+    let score = 0.2;
+
+    if (provider?.verified) {
+      score += 0.3;
     }
 
-    return score;
+    score += this.getConfidenceWeight(provider?.confidence) * 0.2;
+    score += this.getConfidenceWeight(program?.confidence) * 0.15;
+    score += this.getConfidenceWeight(session.confidence) * 0.15;
+
+    return Math.min(1, score);
   }
 
   /**
@@ -639,7 +673,7 @@ export class SearchService implements ISearchService {
         };
 
         const sessions = await this.querySessions(relaxedFilters, cityConfig);
-        const locationCoordinates = await this.loadLocationCoordinates(
+        const searchContext = await this.loadSearchContext(
           sessions,
           filters.cityId,
           cityConfig.defaultCenter
@@ -648,7 +682,7 @@ export class SearchService implements ISearchService {
           sessions,
           relaxedFilters,
           cityConfig,
-          locationCoordinates
+          searchContext
         );
 
         if (filtered.length > 0) {
@@ -656,7 +690,7 @@ export class SearchService implements ISearchService {
             filtered,
             filters,
             cityConfig,
-            locationCoordinates
+            searchContext
           );
           return { scoredSessions: scored, relaxationApplied: true };
         }
@@ -672,7 +706,7 @@ export class SearchService implements ISearchService {
       };
 
       const sessions = await this.querySessions(relaxedFilters, cityConfig);
-      const locationCoordinates = await this.loadLocationCoordinates(
+      const searchContext = await this.loadSearchContext(
         sessions,
         filters.cityId,
         cityConfig.defaultCenter
@@ -681,7 +715,7 @@ export class SearchService implements ISearchService {
         sessions,
         relaxedFilters,
         cityConfig,
-        locationCoordinates
+        searchContext
       );
 
       if (filtered.length > 0) {
@@ -689,7 +723,7 @@ export class SearchService implements ISearchService {
           filtered,
           filters,
           cityConfig,
-          locationCoordinates
+          searchContext
         );
         return { scoredSessions: scored, relaxationApplied: true };
       }
@@ -704,7 +738,7 @@ export class SearchService implements ISearchService {
       };
 
       const sessions = await this.querySessions(relaxedFilters, cityConfig);
-      const locationCoordinates = await this.loadLocationCoordinates(
+      const searchContext = await this.loadSearchContext(
         sessions,
         filters.cityId,
         cityConfig.defaultCenter
@@ -713,7 +747,7 @@ export class SearchService implements ISearchService {
         sessions,
         relaxedFilters,
         cityConfig,
-        locationCoordinates
+        searchContext
       );
 
       if (filtered.length > 0) {
@@ -721,7 +755,7 @@ export class SearchService implements ISearchService {
           filtered,
           filters,
           cityConfig,
-          locationCoordinates
+          searchContext
         );
         return { scoredSessions: scored, relaxationApplied: true };
       }
@@ -817,4 +851,91 @@ export class SearchService implements ISearchService {
 
     return locationCoordinates;
   }
+
+  private async loadSearchContext(
+    sessions: Session[],
+    cityId: string,
+    defaultCenter: Coordinates
+  ): Promise<SearchContext> {
+    const [locationCoordinates, programs, providers] = await Promise.all([
+      this.loadLocationCoordinates(sessions, cityId, defaultCenter),
+      this.loadPrograms(sessions, cityId),
+      this.loadProviders(sessions, cityId),
+    ]);
+
+    return {
+      locationCoordinates,
+      programs,
+      providers,
+    };
+  }
+
+  private async loadPrograms(
+    sessions: Session[],
+    cityId: string
+  ): Promise<Map<string, Program | null>> {
+    const programs = new Map<string, Program | null>();
+    const uniqueProgramIds = Array.from(new Set(sessions.map((session) => session.programId)));
+
+    const programDocs = await Promise.all(
+      uniqueProgramIds.map((programId) => this.sessionRepository.getProgramById(programId, cityId))
+    );
+
+    programDocs.forEach((program, index) => {
+      const programId = uniqueProgramIds[index];
+      if (!programId) {
+        return;
+      }
+
+      programs.set(programId, program || null);
+    });
+
+    return programs;
+  }
+
+  private async loadProviders(
+    sessions: Session[],
+    cityId: string
+  ): Promise<Map<string, Provider | null>> {
+    const providers = new Map<string, Provider | null>();
+    const uniqueProviderIds = Array.from(new Set(sessions.map((session) => session.providerId)));
+
+    const providerDocs = await Promise.all(
+      uniqueProviderIds.map((providerId) =>
+        this.sessionRepository.getProviderById(providerId, cityId)
+      )
+    );
+
+    providerDocs.forEach((provider, index) => {
+      const providerId = uniqueProviderIds[index];
+      if (!providerId) {
+        return;
+      }
+
+      providers.set(providerId, provider || null);
+    });
+
+    return providers;
+  }
+
+  private getConfidenceWeight(
+    confidence?: Provider['confidence'] | Program['confidence'] | Session['confidence']
+  ): number {
+    switch (confidence) {
+      case 'high':
+        return 1;
+      case 'medium':
+        return 0.7;
+      case 'low':
+        return 0.35;
+      default:
+        return 0.15;
+    }
+  }
+}
+
+interface SearchContext {
+  locationCoordinates: Map<string, Coordinates>;
+  programs: Map<string, Program | null>;
+  providers: Map<string, Provider | null>;
 }

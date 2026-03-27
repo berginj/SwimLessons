@@ -83,7 +83,7 @@ export interface SearchRequest {
 
   // User context for personalization
   userContext?: {
-    sessionId: string; // For telemetry tracking
+    sessionId?: string; // Optional request correlation, not required by the current web app
     origin?: Coordinates; // User location (optional, never stored)
   };
 }

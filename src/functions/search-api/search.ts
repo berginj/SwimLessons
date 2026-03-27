@@ -40,7 +40,7 @@ const TRANSIT_ENRICHMENT_LIMIT = 10;
  * Optional fields:
  * - sort: SortRequest
  * - pagination: PaginationRequest
- * - userContext: { sessionId, origin }
+ * - userContext: { sessionId?, origin }
  */
 export async function search(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const startTime = Date.now();

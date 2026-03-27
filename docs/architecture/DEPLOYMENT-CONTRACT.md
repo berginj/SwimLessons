@@ -87,12 +87,13 @@ If any of those steps are skipped, the deployment is incomplete.
 - Staging must not treat an empty NYC search experience as healthy.
 - The staging workflow must reseed the deterministic NYC dataset before smoke tests.
 - Staging smoke tests must assert:
-  - NYC appears in `/api/cities`
-  - NYC `availableSessionCount > 0`
-  - `POST /api/search` returns at least one result
-  - `GET /api/sessions/{id}?cityId=nyc` succeeds for a returned session
-  - the live transit router returns both `routes` and `planConnection`
-  - the API travel time for a subway result stays within tolerance of the live router result
+ - NYC appears in `/api/cities`
+ - NYC `availableSessionCount > 0`
+ - `POST /api/search` returns at least one result
+  - a child-age-filtered `POST /api/search` returns results whose program age bounds include the requested age
+ - `GET /api/sessions/{id}?cityId=nyc` succeeds for a returned session
+ - the live transit router returns both `routes` and `planConnection`
+ - the API travel time for a subway result stays within tolerance of the live router result
   - `POST /api/events` accepts a valid browser telemetry payload
 
 ## Forbidden Changes

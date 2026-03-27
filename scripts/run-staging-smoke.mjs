@@ -286,6 +286,52 @@ async function main() {
   assert(sessionId, 'Expected /api/search to return at least one session id');
   console.log(`✓ /api/search (${searchTotal} results)`);
 
+  const childAgeMonths = 60;
+  const ageFilteredPayload = await fetchJson(`${baseUrl}/api/search`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      cityId: 'nyc',
+      filters: {
+        childAge: childAgeMonths,
+      },
+    }),
+  });
+  assert(
+    ageFilteredPayload.success === true,
+    'Expected child-age filtered /api/search to return success=true'
+  );
+  const ageFilteredResults = ageFilteredPayload.data?.results;
+  assert(
+    Array.isArray(ageFilteredResults) && ageFilteredResults.length > 0,
+    'Expected child-age filtered /api/search to return at least one result'
+  );
+
+  for (const result of ageFilteredResults.slice(0, 5)) {
+    const candidateSessionId = result?.session?.id;
+    assert(candidateSessionId, 'Expected child-age filtered results to include session ids');
+
+    const candidatePayload = await fetchJson(
+      `${baseUrl}/api/sessions/${encodeURIComponent(candidateSessionId)}?cityId=nyc`
+    );
+    const program = candidatePayload.data?.program;
+    const ageMin = program?.ageMin;
+    const ageMax = program?.ageMax;
+
+    assert(
+      typeof ageMin === 'number' || typeof ageMax === 'number',
+      `Expected ${candidateSessionId} to include program age bounds`
+    );
+    assert(
+      (typeof ageMin !== 'number' || ageMin <= childAgeMonths) &&
+        (typeof ageMax !== 'number' || ageMax >= childAgeMonths),
+      `Expected ${candidateSessionId} to match childAge ${childAgeMonths}, got ageMin=${ageMin}, ageMax=${ageMax}`
+    );
+  }
+  console.log(`✓ /api/search childAge filter (${ageFilteredResults.length} results for ${childAgeMonths} months)`);
+
   const sessionPayload = await fetchJson(
     `${baseUrl}/api/sessions/${encodeURIComponent(sessionId)}?cityId=nyc`
   );
