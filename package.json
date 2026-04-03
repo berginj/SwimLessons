@@ -12,6 +12,7 @@
     "seed:nyc": "tsx scripts/load-sessions.ts data/sessions-template.csv",
     "seed:nyc:from-tableau": "node scripts/ingest-tableau-twbx.mjs",
     "seed:staging:nyc": "node scripts/seed-staging-nyc.mjs",
+    "validate:seed:nyc": "node scripts/validate-nyc-seed-data.mjs",
     "operator:city-dashboard": "node scripts/operator-city-dashboard.mjs",
     "operator:city-stats": "node scripts/operator-city-stats.mjs",
     "smoke:transit:staging": "node scripts/smoke-transit-router.mjs",

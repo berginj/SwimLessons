@@ -8,6 +8,7 @@ export * from './contracts/city-config';
 export * from './contracts/city-adapter';
 export * from './contracts/repositories';
 export * from './contracts/api-contracts';
+export * from './contracts/facility-reference';
 
 // Models
 export * from './models/canonical-schema';

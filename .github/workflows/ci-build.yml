@@ -34,6 +34,9 @@ jobs:
       - name: Validate Deployment Contract
         run: npm run validate:deployment-contract
 
+      - name: Validate Deterministic NYC Seed
+        run: npm run validate:seed:nyc
+
       - name: Build TypeScript
         run: npm run build
 

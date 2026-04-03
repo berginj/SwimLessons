@@ -18,6 +18,12 @@ For this repo, facility data and session data are different sources with differe
 - session data is a separate, rapid-changing feed
 - session rows must crosswalk back to facility records through a stable facility identifier such as `ACCELA`, permit id, or site id
 
+Facility-reference contract and artifact:
+
+- `docs/architecture/FACILITY-REFERENCE-CONTRACT.md`
+- `data/nyc-facilities-canonical.json`
+- `scripts/build-nyc-facility-reference.py`
+
 That means:
 
 - a facility workbook is valid as a facility inventory or crosswalk source
@@ -29,6 +35,7 @@ That means:
 
 - Node available in the repo environment
 - Either `unzip` or `tar` available on `PATH` to inspect the `.twbx` archive
+- Python with `tableauhyperapi` available if you also want to build the canonical facility-reference artifact directly from `.twbx` / `.hyper`
 - A local Tableau workbook file (example user path on Windows):
   - `C:\Users\bergi\Downloads\Specific NYC Pool Data.twbx`
 
@@ -56,6 +63,23 @@ The script will:
 4. write `data/sessions-from-tableau.csv`.
 
 If the workbook contains only Tableau extracts (`.hyper`) and no session-ready CSV, the script inspects workbook metadata and fails with a specific validation error instead of silently inventing session rows.
+
+If the workbook is facility/inspection-oriented, use the facility-reference builder instead:
+
+```powershell
+python scripts/build-nyc-facility-reference.py `
+  --input "C:\Users\bergi\Downloads\Specific NYC Pool Data.twbx" `
+  --output data/nyc-facilities-canonical.json `
+  --csv-output data/nyc-facilities-canonical.csv
+```
+
+After refreshing the canonical facility artifact, run:
+
+```powershell
+npm run validate:seed:nyc
+```
+
+That catches any drift between the checked-in deterministic session template and the canonical facility layer before a local or staging reseed.
 
 ## Canonical output schema
 

@@ -15,6 +15,7 @@
 **👉 [ORCHESTRATION-TRACKER.md](./ORCHESTRATION-TRACKER.md)** - Canonical handoff, backlog, and next-task tracker for agents
 **👉 [DEPLOYMENT-CONTRACT.md](./DEPLOYMENT-CONTRACT.md)** - Deployment ownership, sequence, and anti-drift rules
 **👉 [TRANSIT-ROUTER-CONTRACT.md](./TRANSIT-ROUTER-CONTRACT.md)** - NYC schedule-based transit routing boundary and fallback rules
+**👉 [FACILITY-REFERENCE-CONTRACT.md](./FACILITY-REFERENCE-CONTRACT.md)** - Canonical NYC facility identity and crosswalk contract for session seed/feed alignment
 **👉 [../operations/OPERATOR-STATS-RUNBOOK.md](../operations/OPERATOR-STATS-RUNBOOK.md)** - Safe operator workflow for the protected city stats endpoint, CLI, and local dashboard report
 
 ### 📖 Deep Dives
@@ -43,16 +44,16 @@ They are helpful for understanding boundaries, but they should not override the 
 
 ## 🎯 Contract Overview
 
-We've created **5 core contract files** that define **all** integration points:
+The active contract set now includes:
 
-| Contract File | Lines | Purpose |
-|---------------|-------|---------|
-| `city-config.ts` | 250 | City configuration types, search profiles |
-| `city-adapter.ts` | 180 | City data adapter interface |
-| `services.ts` | 570 | Service layer interfaces (8 services) |
-| `repositories.ts` | 450 | Data access layer (3 repositories) |
-| `api-contracts.ts` | 490 | HTTP request/response types (15 endpoints) |
-| **Total** | **1,940 lines** | **Complete integration specification** |
+| Contract File | Purpose |
+|---------------|---------|
+| `city-config.ts` | City configuration types and search profile behavior |
+| `city-adapter.ts` | City data adapter interface |
+| `services.ts` | Service layer interfaces |
+| `repositories.ts` | Data access layer contracts |
+| `api-contracts.ts` | HTTP request/response types |
+| `facility-reference.ts` | Canonical facility identity and crosswalk contract for seed/feed alignment |
 
 ---
 

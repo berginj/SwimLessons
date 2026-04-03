@@ -666,6 +666,24 @@ function renderResults(results) {
           <span class="age-fit-note">${escapeHtml(ageFit)}</span>
         </div>`
       : '';
+    const trustSignals = [
+      formatProviderTrust(result.provider),
+      formatSkillLevel(result.program?.skillLevel),
+      formatFacilityType(result.location?.facilityType),
+    ].filter(Boolean);
+    const trustSummary = trustSignals.length > 0
+      ? `<div class="result-signals">${trustSignals
+          .map((signal, signalIndex) =>
+            `<span class="${signalIndex === 0 ? 'trust-badge' : 'signal-badge'}">${escapeHtml(signal)}</span>`
+          )
+          .join('')}</div>`
+      : '';
+    const description = result.program?.description
+      ? `<p class="result-description">${escapeHtml(result.program.description)}</p>`
+      : '';
+    const addressLine = result.location?.address
+      ? `<p class="result-address">${escapeHtml(result.location.address)}</p>`
+      : '';
 
     const card = document.createElement('article');
     card.className = 'result-card';
@@ -680,6 +698,9 @@ function renderResults(results) {
         </div>
         <span class="price-badge">${formatPrice(result.session?.price?.amount)}</span>
       </div>
+      ${trustSummary}
+      ${addressLine}
+      ${description}
       <div class="result-meta">
         <span>${formatDays(result.session?.daysOfWeek || [])}</span>
         <span>${formatTimeRange(result.session?.timeOfDay)}</span>
@@ -804,6 +825,13 @@ function renderDialog(details) {
   const registrationUrl = details.session?.registrationUrl || 'https://example.com/';
   const ageRange = formatAgeRange(details.program);
   const ageFit = formatAgeFitSummary(details.program, state.activeChildAgeMonths);
+  const sessionSnapshotItems = [
+    formatProviderTrust(details.provider),
+    formatSkillLevel(details.program?.skillLevel),
+    formatFacilityType(details.location?.facilityType),
+    formatAvailability(details.session?.availableSpots),
+    formatPriceDetail(details.session?.price?.amount),
+  ].filter(Boolean);
   const travelBlock = details.travelTime
     ? `<div class="detail-block">
         <h3>Travel</h3>
@@ -817,6 +845,14 @@ function renderDialog(details) {
         <p class="detail-age-fit">${escapeHtml(ageFit)}</p>
       </div>`
     : '';
+  const sessionSnapshot = sessionSnapshotItems.length > 0
+    ? `<div class="detail-block">
+        <h3>Session snapshot</h3>
+        <ul class="detail-pill-list">
+          ${sessionSnapshotItems.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
+        </ul>
+      </div>`
+    : '';
 
   elements.dialogContent.innerHTML = `
     <div class="detail-grid">
@@ -825,6 +861,7 @@ function renderDialog(details) {
         <p>${escapeHtml(details.program?.description || 'Detailed session information is available through the linked provider.')}</p>
       </div>
       ${ageBlock}
+      ${sessionSnapshot}
       <div class="detail-block">
         <h3>Provider</h3>
         <p>${escapeHtml(details.provider?.name || 'Unknown provider')}</p>
@@ -1073,6 +1110,43 @@ function formatTravelConfidenceSentence(confidence) {
     return 'Schedule-based estimate:';
   }
   return 'Fallback estimate:';
+}
+
+function formatProviderTrust(provider) {
+  if (!provider) {
+    return '';
+  }
+
+  return provider.verified ? 'Verified provider' : 'Provider details unverified';
+}
+
+function formatSkillLevel(skillLevel) {
+  if (!skillLevel || skillLevel === 'all') {
+    return 'Mixed levels';
+  }
+
+  return `${skillLevel.charAt(0).toUpperCase()}${skillLevel.slice(1)} level`;
+}
+
+function formatFacilityType(facilityType) {
+  switch (facilityType) {
+    case 'indoor':
+      return 'Indoor pool';
+    case 'outdoor':
+      return 'Outdoor pool';
+    case 'both':
+      return 'Indoor/outdoor access';
+    default:
+      return 'Pool type not listed';
+  }
+}
+
+function formatPriceDetail(amount) {
+  if (!Number.isFinite(amount)) {
+    return 'Price TBD';
+  }
+
+  return `${formatPrice(amount)} total program price`;
 }
 
 function formatAgeRange(program) {

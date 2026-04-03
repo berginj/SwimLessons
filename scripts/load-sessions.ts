@@ -16,6 +16,10 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { fileURLToPath } from 'url';
+import type {
+  FacilityReferenceDataset,
+  FacilityReferenceRecord,
+} from '../src/core/contracts/facility-reference';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -48,16 +52,6 @@ interface SessionCSVRow {
   notes: string;
 }
 
-interface FacilityCSVRow {
-  Permit_ID: string;
-  Facility_Name: string;
-  ADDRESS_No: string;
-  ADDRESS_St: string;
-  BO: string;
-  ZIP: string;
-  Indoor: string;
-}
-
 /**
  * Parse CSV file
  */
@@ -82,28 +76,17 @@ function parseCSV(filepath: string): SessionCSVRow[] {
   return rows;
 }
 
-function loadFacilityMetadata(filepath: string): Map<string, FacilityCSVRow> {
-  const facilityMap = new Map<string, FacilityCSVRow>();
-
+function loadFacilityMetadata(filepath: string): Map<string, FacilityReferenceRecord> {
   if (!fs.existsSync(filepath)) {
-    return facilityMap;
+    throw new Error(`Canonical facility reference not found: ${filepath}`);
   }
 
-  const content = fs.readFileSync(filepath, 'utf-8');
-  const lines = content.trim().split('\n');
-  const headers = splitCsvLine(lines[0]).map((header) => header.trim());
+  const dataset = JSON.parse(fs.readFileSync(filepath, 'utf-8')) as FacilityReferenceDataset;
+  const facilityMap = new Map<string, FacilityReferenceRecord>();
 
-  for (let i = 1; i < lines.length; i++) {
-    const values = splitCsvLine(lines[i]);
-    const row: Record<string, string> = {};
-
-    headers.forEach((header, index) => {
-      row[header] = values[index]?.trim() || '';
-    });
-
-    const facility = row as unknown as FacilityCSVRow;
-    if (facility.Permit_ID) {
-      facilityMap.set(facility.Permit_ID, facility);
+  for (const facility of dataset.facilities || []) {
+    if (facility.sourceFacilityId) {
+      facilityMap.set(facility.sourceFacilityId, facility);
     }
   }
 
@@ -145,11 +128,15 @@ function splitCsvLine(line: string): string[] {
 /**
  * Transform CSV row to Session document
  */
-function csvToSession(row: SessionCSVRow, index: number): any {
+function csvToSession(
+  row: SessionCSVRow,
+  index: number,
+  facility: FacilityReferenceRecord
+): any {
   const timestamp = new Date().toISOString();
   const facilityId = row.facility_id;
   const programId = `nyc-prog-${facilityId}-${row.skill_level}`;
-  const locationId = `nyc-loc-${facilityId}`;
+  const locationId = facility.locationId;
 
   // Parse days of week ("1,3,5" → [1, 3, 5])
   const daysOfWeek = row.days_of_week.split(',').map((d) => parseInt(d.trim()));
@@ -182,7 +169,7 @@ function csvToSession(row: SessionCSVRow, index: number): any {
       amount: parseFloat(row.price) || 0,
       currency: 'USD',
     },
-    searchTerms: `${row.program_name} ${row.skill_level} nyc doe`.toLowerCase(),
+    searchTerms: `${row.program_name} ${row.skill_level} ${facility.displayName} nyc doe`.toLowerCase(),
     geographyIds: [], // Will be populated from location
     confidence: 'medium',
     sourceSystem: 'csv-import',
@@ -233,27 +220,32 @@ function buildProviderDocument(timestamp: string) {
   };
 }
 
-function buildLocationDocument(facility: FacilityCSVRow, timestamp: string) {
-  const geographyId = mapBoroughCode(facility.BO);
-  const coordinates = getFallbackCoordinates(geographyId);
+function buildLocationDocument(facility: FacilityReferenceRecord, timestamp: string) {
+  const geographyId =
+    facility.geography.geographyId ||
+    mapBoroughCode(facility.geography.boroughCode || '');
+  const coordinates = facility.coordinates || getFallbackCoordinates(geographyId);
 
   return {
-    id: `nyc-loc-${facility.Permit_ID}`,
+    id: facility.locationId,
     cityId: 'nyc',
     type: 'LocationDocument',
     providerId: 'nyc-provider-doe',
-    name: facility.Facility_Name || `Facility ${facility.Permit_ID}`,
+    name: facility.officialName || facility.displayName || `Facility ${facility.sourceFacilityId}`,
     address: {
-      street: `${facility.ADDRESS_No} ${facility.ADDRESS_St}`.trim(),
+      street: facility.address.street1,
       city: 'New York',
       state: 'NY',
-      zipCode: facility.ZIP,
+      zipCode: facility.address.postalCode || '',
       geographyId,
     },
     coordinates,
-    facilityType: facility.Indoor === 'Indoor' ? 'indoor' : 'outdoor',
+    facilityType:
+      facility.facilityType === 'indoor' || facility.facilityType === 'outdoor'
+        ? facility.facilityType
+        : 'both',
     confidence: 'medium',
-    sourceSystem: 'csv-import',
+    sourceSystem: facility.sourceSystem || 'facility-reference',
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -261,7 +253,7 @@ function buildLocationDocument(facility: FacilityCSVRow, timestamp: string) {
 
 function buildProgramDocument(
   row: SessionCSVRow,
-  facility: FacilityCSVRow,
+  facility: FacilityReferenceRecord,
   timestamp: string
 ) {
   return {
@@ -269,7 +261,7 @@ function buildProgramDocument(
     cityId: 'nyc',
     type: 'ProgramDocument',
     providerId: 'nyc-provider-doe',
-    locationId: `nyc-loc-${facility.Permit_ID}`,
+    locationId: facility.locationId,
     name: row.program_name,
     description: row.notes,
     ageMin: parseInt(row.age_min_months) || undefined,
@@ -289,6 +281,27 @@ function buildProgramDocument(
     createdAt: timestamp,
     updatedAt: timestamp,
   };
+}
+
+function validateSessionRows(
+  rows: SessionCSVRow[],
+  facilityMap: Map<string, FacilityReferenceRecord>
+) {
+  const missingFacilityIds = new Set<string>();
+
+  for (const row of rows) {
+    if (!row.facility_id || !facilityMap.has(row.facility_id)) {
+      missingFacilityIds.add(row.facility_id || '<blank>');
+    }
+  }
+
+  if (missingFacilityIds.size > 0) {
+    throw new Error(
+      `Session seed rows reference facility ids missing from data/nyc-facilities-canonical.json: ${Array.from(
+        missingFacilityIds
+      ).join(', ')}`
+    );
+  }
 }
 
 /**
@@ -321,7 +334,10 @@ async function loadSessions(csvPath: string) {
   console.log('');
 
   console.log('3️⃣  Loading supporting provider/location/program data...');
-  const facilityMap = loadFacilityMetadata(path.join(__dirname, '../data/nyc-pools-sample.csv'));
+  const facilityMap = loadFacilityMetadata(
+    path.join(__dirname, '../data/nyc-facilities-canonical.json')
+  );
+  validateSessionRows(rows, facilityMap);
   const timestamp = new Date().toISOString();
   const createdLocations = new Set<string>();
   const createdPrograms = new Set<string>();
@@ -356,12 +372,16 @@ async function loadSessions(csvPath: string) {
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const session = csvToSession(row, i);
-
     const facility = facilityMap.get(row.facility_id);
-    if (facility) {
-      session.geographyIds = [mapBoroughCode(facility.BO)];
+    if (!facility) {
+      throw new Error(`Facility metadata missing for ${row.facility_id}`);
     }
+
+    const session = csvToSession(row, i, facility);
+    const geographyId =
+      facility.geography.geographyId ||
+      mapBoroughCode(facility.geography.boroughCode || '');
+    session.geographyIds = geographyId ? [geographyId] : [];
 
     try {
       await container.items.upsert(session);
@@ -420,9 +440,9 @@ async function loadSessions(csvPath: string) {
   console.log('✅ Session loading complete!');
   console.log('');
   console.log('🎯 Next steps:');
-  console.log('   1. Test search API with real sessions');
-  console.log('   2. Deploy frontend to see sessions in UI');
-  console.log('   3. Launch pilot with real users!');
+  console.log('   1. Run npm run validate:seed:nyc before reseeding shared environments');
+  console.log('   2. Run npm run build and npm test to verify repo state');
+  console.log('   3. For staging, wait for Azure to be writable, then run npm run seed:staging:nyc');
   console.log('');
 }
 

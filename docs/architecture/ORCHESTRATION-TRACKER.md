@@ -1,7 +1,7 @@
 # Orchestration Tracker
 
 **Purpose:** Canonical pullable handoff for agents working on the NYC MVP
-**Last Updated:** 2026-04-02
+**Last Updated:** 2026-04-03
 **Status:** Active
 
 ---
@@ -51,6 +51,8 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Search results and session details now surface program age range and age-fit context when provider age bounds are available
 - Search quality scoring now uses provider/program/session signals instead of session confidence alone
 - `SearchRequest.userContext.sessionId` is now optional and aligned with the current browser request shape
+- NYC now has a repo-owned canonical facility reference contract and artifact (`docs/architecture/FACILITY-REFERENCE-CONTRACT.md`, `data/nyc-facilities-canonical.json`) generated from the validated Tableau facility workbook, preserving stable facility ids, address/civic metadata, coordinates, and deterministic crosswalk keys for future messy lesson feeds
+- Repo-side deterministic seed validation now exists at `npm run validate:seed:nyc`, asserting the checked-in NYC session template stays aligned with the canonical facility artifact and current 144-session baseline before any shared-environment reseed
 - Current staging verification blocker on `2026-04-02`: the Azure subscription is read-only (`ReadOnlyDisabledSubscription`) and `func-swim-stg01c` reports `state: AdminDisabled`, so the tracked staging URL currently returns `404` and cannot be reseeded or revalidated until the environment is re-enabled
 
 ---
@@ -82,6 +84,7 @@ Note:
   - search journey in `docs/architecture/integration-flows.md`
   - staging deploy and smoke path in `docs/architecture/DEPLOYMENT-CONTRACT.md`
   - NYC transit provider boundary in `docs/architecture/TRANSIT-ROUTER-CONTRACT.md`
+  - NYC facility reference boundary in `docs/architecture/FACILITY-REFERENCE-CONTRACT.md`
 - Product/story contracts touched:
   - NYC is the deterministic first path
   - default transit origin is Times Square, with optional browser-provided override
@@ -165,18 +168,24 @@ Scoring formula:
 - Added a Tableau TWBX-to-canonical session CSV ingestion path and runbook so external NYC pool datasets can be transformed into the existing deterministic loader format without changing endpoint contracts
 - Validated the provided `Specific NYC Pool Data.twbx` workbook and confirmed it is facility/inspection-oriented (`ACCELA`, `Facility_Name`, `Inspection_Date`, address, borough, violations) with overlap against the current NYC facility sample IDs, but it lacks lesson schedule/program fields and cannot be ingested directly into canonical session seed rows without a separate session-level export
 - The current ingestion boundary is now explicit: facility datasets are slow-changing reference/crosswalk sources, while session datasets are separate fast-changing feeds that must link back to facilities by stable identifiers such as `ACCELA` or permit id
+- Added a first-class NYC facility reference contract plus builder path for `.twbx` / `.hyper` / CSV inputs so facility identity, civic metadata, latest inspection summary, and deterministic crosswalk keys live in a repo-owned canonical artifact instead of only in ad hoc sample CSVs
+- The session seed loader now reads `data/nyc-facilities-canonical.json` for facility lookup and `locationId` alignment, keeping session seed rows tied to the same canonical facility identity layer used for future lesson-feed crosswalks
 - The local deterministic NYC session seed now covers all 24 canonical sample facilities with 6 example lesson sessions each (144 total) so the parent-facing experience no longer dead-ends around only 5 seeded pools when the dataset is refreshed
+- Added a repo-owned deterministic seed validation step (`npm run validate:seed:nyc`) so session-template drift against `data/nyc-facilities-canonical.json` is caught locally and in CI before Azure reseeds
+- Root repo docs were realigned to the active NYC MVP contract so contributors are not pointed at planning-era React/foundation assumptions
 - Staging revalidation is currently blocked because `npm run seed:staging:nyc` fails against a read-only Azure subscription and the linked staging Function App `func-swim-stg01c` is `AdminDisabled`, which leaves the tracked staging site returning `404` as of `2026-04-02`
 
 ### Workflow/Code Areas Requiring Re-Review
 
 - `docs/architecture/DEPLOYMENT-CONTRACT.md`
 - `src/functions/README.md`
+- `docs/architecture/FACILITY-REFERENCE-CONTRACT.md`
 - `src/functions/search-api/search.ts`
 - `src/functions/search-api/session-details.ts`
 - `src/services/transit/transit-service.ts`
 - `src/functions/telemetry-api/events.ts`
 - `src/web/telemetry.js`
+- `scripts/build-nyc-facility-reference.py`
 - `scripts/ingest-tableau-twbx.mjs`
 - `data/sessions-template.csv`
 

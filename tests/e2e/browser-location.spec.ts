@@ -279,12 +279,18 @@ test.describe('browser location transit regression', () => {
     await expect(page.getByText('1 session found for 5-year-olds')).toBeVisible();
     await expect(page.getByText('Ages 5 years to 8 years')).toBeVisible();
     await expect(page.getByText('Good fit for 5-year-olds')).toBeVisible();
+    await expect(page.getByText('Verified provider')).toBeVisible();
+    await expect(page.getByText('Beginner level')).toBeVisible();
+    await expect(page.getByText('549 Audubon Ave, New York, NY 10040')).toBeVisible();
 
     await page.getByRole('button', { name: 'View details' }).click();
     const dialog = page.locator('#dialog-content');
     await expect(page.getByRole('heading', { name: 'Age fit' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Session snapshot' })).toBeVisible();
     await expect(dialog.getByText('Ages 5 years to 8 years')).toBeVisible();
     await expect(dialog.getByText('Good fit for 5-year-olds')).toBeVisible();
+    await expect(dialog.getByText('Verified provider')).toBeVisible();
+    await expect(dialog.getByText('Indoor pool')).toBeVisible();
     await page.getByRole('button', { name: 'Close' }).click();
 
     await expect
@@ -342,6 +348,8 @@ test.describe('browser location transit regression', () => {
       await expect(
         page.getByText('~17 min by subway · 4.1 mi · schedule-based')
       ).toBeVisible();
+      await expect(page.locator('#results').getByText('Verified provider')).toBeVisible();
+      await expect(page.locator('#results').getByText('Beginner level')).toBeVisible();
 
       await expect
         .poll(() => getTelemetryEvents(capturedTelemetryRequests).length)
@@ -370,6 +378,8 @@ test.describe('browser location transit regression', () => {
 
       const latestOrigin = JSON.parse(capturedSessionDetailOrigins.at(-1) || '{}');
       expect(latestOrigin).toEqual(browserOrigin);
+      await expect(page.getByRole('heading', { name: 'Session snapshot' })).toBeVisible();
+      await expect(page.locator('#dialog-content').getByText('Indoor pool')).toBeVisible();
 
       await page.getByRole('button', { name: 'Close' }).click();
 

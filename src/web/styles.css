@@ -324,10 +324,33 @@ body {
 
 .price-badge,
 .availability-badge,
-.travel-badge {
+.travel-badge,
+.trust-badge,
+.signal-badge {
   border-radius: 999px;
   padding: 7px 11px;
   font-size: 0.85rem;
+}
+
+.result-signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.result-address,
+.result-description {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.result-address {
+  color: var(--muted);
+  font-size: 0.94rem;
+}
+
+.result-description {
+  font-size: 0.97rem;
 }
 
 .result-age {
@@ -353,6 +376,16 @@ body {
 .price-badge {
   background: rgba(13, 124, 134, 0.11);
   color: var(--accent-strong);
+}
+
+.trust-badge {
+  background: rgba(21, 101, 70, 0.12);
+  color: var(--success-text);
+}
+
+.signal-badge {
+  background: rgba(24, 49, 63, 0.08);
+  color: var(--text);
 }
 
 .availability-badge {
@@ -414,6 +447,22 @@ body {
 
 .detail-block ul {
   padding-left: 18px;
+}
+
+.detail-pill-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.detail-pill-list li {
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: rgba(24, 49, 63, 0.08);
+  color: var(--text);
+  font-size: 0.9rem;
 }
 
 .detail-actions {

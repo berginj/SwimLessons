@@ -1,426 +1,142 @@
-# 🏊 Session Data Template - Add Swim Schedules
+# Session Data Guide
 
-## ✅ **What I Created**
+This guide covers the deterministic NYC lesson seed used by the current MVP.
 
-| File | Purpose | Lines |
-|------|---------|-------|
-| `data/sessions-template.csv` | Pre-filled template with 144 example sessions across 24 canonical facilities | 145 |
-| `scripts/load-sessions.ts` | Script to load sessions from CSV | 200 |
-| `SESSION-DATA-GUIDE.md` | This guide - how to use templates | - |
+## Current Seed Contract
 
----
+The NYC seed path is intentionally split into two layers:
 
-## 🔁 **Deterministic Seed Behavior**
+- `data/nyc-facilities-canonical.json`: slow-changing canonical facility identity
+- `data/sessions-template.csv`: fast-changing lesson/session rows that crosswalk back to canonical facilities through `facility_id`
 
-The loader is now self-contained for the NYC MVP seed path:
+The loader:
 
-- It reads `data/sessions-template.csv`
-- It upserts the NYC DOE provider document
-- It upserts the related location and program documents needed by search and session-details
-- It can reseed staging directly with `npm run seed:staging:nyc` after `az login`
+- reads `data/sessions-template.csv`
+- requires every `facility_id` to exist in `data/nyc-facilities-canonical.json`
+- reuses canonical `locationId` values instead of inventing new location ids at load time
+- upserts the provider, location, program, and session documents needed by search and session details
 
-That means staging can be restored to a known 144-session baseline without manual Cosmos edits.
+## Deterministic Baseline
 
----
+The checked-in deterministic template currently represents:
 
-## 📥 **Tableau TWBX Ingestion Path**
+- 144 session rows
+- 24 seeded facility ids
+- 6 sessions per seeded facility
 
-If your source is a Tableau packaged workbook (`.twbx`) such as:
+Validate that baseline before local or shared-environment loads:
 
-- `C:\Users\bergi\Downloads\Specific NYC Pool Data.twbx`
-
-use the TWBX converter first, then load the generated canonical CSV:
-
-```bash
-node scripts/ingest-tableau-twbx.mjs --input "<path-to-file.twbx>" --output data/sessions-from-tableau.csv
-npx tsx scripts/load-sessions.ts data/sessions-from-tableau.csv
+```powershell
+npm run validate:seed:nyc
 ```
 
-Full runbook:
+That command checks:
 
-- `docs/operations/TABLEAU-TWBX-INGESTION-RUNBOOK.md`
+- the canonical facility artifact exists and has unique `sourceFacilityId` and `locationId` values
+- every seeded `facility_id` resolves through the canonical artifact
+- the current template still matches the expected 144 / 24 / 6 deterministic baseline
 
-Important validation note:
+## Local Load
 
-- The provided `Specific NYC Pool Data.twbx` was validated locally on 2026-04-02.
-- It contains a Tableau `.hyper` extract backed by a workbook sheet named `NYC_Pool_Insp_7-2025 Workin (2)`.
-- Its columns are facility/inspection-oriented (`ACCELA`, `Facility_Name`, `Inspection_Date`, address, borough, violations).
-- It does not contain the session/program schedule fields required to produce canonical session seed rows safely.
-- Do not turn that workbook directly into session data by defaulting missing program names, dates, or times; export or provide a schedule-level dataset first.
-
-Critical data-model note:
-
-- treat that workbook as facility reference data, not session seed data
-- facility data changes infrequently and should be refreshed on a slower cadence
-- session data changes rapidly and should be ingested separately
-- session rows should crosswalk back to the facility layer using a stable facility identifier such as `ACCELA` / permit id
-
----
-
-## 📋 **Template Overview**
-
-**File:** `data/sessions-template.csv`
-
-**Contains 144 example sessions** across **24 canonical NYC facilities**.
-
-Each facility now has **6 lesson choices** spanning:
-
-| Track | Skill | Typical schedule | Typical age range |
-|----------|---------|------|-------|
-| **Water Confidence** | beginner | weekday late afternoon | 3-6 years |
-| **Water Confidence** | beginner | Saturday morning | 3-6 years |
-| **Stroke Builder** | intermediate | Tue/Thu after school | 6-11 years |
-| **Stroke Builder** | intermediate | Sunday late morning | 6-11 years |
-| **Teen Technique** | advanced | weekday evening | 9-15 years |
-| **Family Swim Sampler** | all | Friday early evening | 2-10 years |
-
-**These are EXAMPLES** - Edit with real data from school websites!
-
----
-
-## 🎯 **How to Use**
-
-### **Option 1: Use Template As-Is (Quick Demo)**
-
-**Just load the example data:**
+Load the checked-in NYC template into Cosmos:
 
 ```powershell
 npm run seed:nyc
 ```
 
-**Result:**
-- ✅ 144 sessions loaded
-- ✅ 24 canonical facilities have swim programs
-- ✅ Ready to demo immediately
-- ⚠️ Data is example (not real schedules)
+Or load a different CSV:
 
----
-
-### **Option 2: Research and Fill Real Data (Recommended)**
-
-**Step 1: Research Each Facility**
-
-**For each facility you want to replace with real schedules, find:**
-
-The deterministic template already covers all canonical locations in `data/nyc-pools-sample.csv`, so you do not need to start from an empty shell. A practical first pass is to replace the highest-priority facilities first.
-
-**Brooklyn Tech H.S. (40425704):**
-- Google: "Brooklyn Tech High School swim program"
-- Or call: (718) 804-6400
-- Or visit: https://www.bths.edu/
-
-**What to find:**
-- ✅ Summer 2026 swim program dates
-- ✅ Days and times offered
-- ✅ Price (or "free" for NYC residents)
-- ✅ Registration URL
-- ✅ How many spots available
-
-**Then repeat for additional facilities listed in `data/nyc-pools-sample.csv`** until the example schedules have been replaced with real ones.
-
----
-
-**Step 2: Edit the CSV**
-
-**Open:** `data/sessions-template.csv`
-
-**Replace example data with real data:**
-
-```csv
-facility_id,program_name,skill_level,age_min_months,age_max_months,start_date,end_date,days_of_week,time_start,time_end,price,capacity,enrolled,registration_url,notes
-40425704,Summer Swim 2026,beginner,48,84,2026-07-06,2026-08-14,"1,2,3,4,5",14:00,15:00,50,30,0,https://real-registration-url.com,Real schedule from website
-```
-
-**Fields explained:**
-- `facility_id`: From nyc-pools-sample.csv (Permit_ID column)
-- `program_name`: What the school calls it
-- `skill_level`: beginner, intermediate, or advanced
-- `age_min_months`: 48 = 4 years old, 84 = 7 years old
-- `age_max_months`: 96 = 8 years, 168 = 14 years
-- `start_date`: YYYY-MM-DD format
-- `end_date`: YYYY-MM-DD format
-- `days_of_week`: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
-- `time_start`: HH:MM format (24-hour)
-- `time_end`: HH:MM format
-- `price`: Dollar amount (just number, no $)
-- `capacity`: Total spots available
-- `enrolled`: How many already signed up
-- `registration_url`: Where to sign up
-- `notes`: Any additional info
-
----
-
-**Step 3: Load Sessions**
-
-```powershell
-npm run seed:nyc
-```
-
-**Or load custom CSV:**
-```powershell
-npx tsx scripts/load-sessions.ts data/my-custom-sessions.csv
-```
-
----
-
-### **Option 3: Add More Sessions (Expand Coverage)**
-
-**Copy the template and add more:**
-
-1. **Copy template:**
-   ```powershell
-   cp data/sessions-template.csv data/summer-2026-sessions.csv
-   ```
-
-2. **Add more rows** for:
-   - More facilities (use other facility_ids from nyc-pools-sample.csv)
-   - More time slots (morning, afternoon, evening)
-   - More skill levels
-   - More days (weekday, weekend, daily)
-
-3. **Load:**
-   ```powershell
-   npx tsx scripts/load-sessions.ts data/summer-2026-sessions.csv
-   ```
-
----
-
-## 📝 **Template Fields Reference**
-
-### **facility_id** (Required)
-**Value:** Permit_ID from `nyc-pools-sample.csv`
-
-**Examples:**
-- `40425704` = Brooklyn Tech H.S.
-- `40425705` = Abraham Lincoln H.S.
-- `40425724` = George Washington H.S.
-
-**Find it:**
-```bash
-# List all facility IDs
-cat data/nyc-pools-sample.csv | cut -d',' -f2
-```
-
----
-
-### **skill_level** (Required)
-**Values:** `beginner`, `intermediate`, `advanced`, `all`
-
-**Guidelines:**
-- **beginner:** Ages 4-7, learning to swim
-- **intermediate:** Ages 7-12, improving strokes
-- **advanced:** Ages 12-16, competitive prep
-
----
-
-### **age_min_months / age_max_months** (Required)
-**Convert years to months:**
-- 2 years = 24 months
-- 4 years = 48 months
-- 6 years = 72 months
-- 8 years = 96 months
-- 10 years = 120 months
-- 12 years = 144 months
-- 14 years = 168 months
-
-**Example:**
-- Ages 5-8: `age_min_months=60, age_max_months=96`
-
----
-
-### **days_of_week** (Required)
-**Format:** Comma-separated numbers
-
-**Day codes:**
-- 0 = Sunday
-- 1 = Monday
-- 2 = Tuesday
-- 3 = Wednesday
-- 4 = Thursday
-- 5 = Friday
-- 6 = Saturday
-
-**Examples:**
-- Mon/Wed/Fri: `1,3,5`
-- Tue/Thu: `2,4`
-- Weekends: `0,6`
-- Daily: `0,1,2,3,4,5,6`
-
----
-
-### **time_start / time_end** (Required)
-**Format:** HH:MM (24-hour time)
-
-**Examples:**
-- 8:00 AM = `08:00`
-- 3:30 PM = `15:30`
-- 5:00 PM = `17:00`
-- 6:30 PM = `18:30`
-
----
-
-### **price** (Required)
-**Format:** Number only (no $)
-
-**Typical NYC DOE Prices:**
-- Free for NYC residents: `0`
-- Subsidized: `25-50`
-- Standard: `75-100`
-- Premium: `150-200`
-
----
-
-### **capacity / enrolled** (Optional)
-**capacity:** Total spots in the class
-**enrolled:** How many already signed up
-
-**Script calculates:**
-- `availableSpots = capacity - enrolled`
-- `registrationOpen = availableSpots > 0`
-
-**Example:**
-- `capacity=20, enrolled=8` → 12 spots available
-
----
-
-## 🚀 **Quick Start (Use Example Data)**
-
-**To get started immediately with example data:**
-
-```powershell
-npm run seed:nyc
-```
-
-**This loads 144 example sessions across 24 canonical facilities** so you can:
-- ✅ Test search functionality
-- ✅ See how sessions appear in UI
-- ✅ Demo to stakeholders
-- ✅ Test booking flow
-
-**Later:** Replace with real data from school websites.
-
----
-
-## 📊 **What Gets Created**
-
-**Each CSV row becomes a Session document:**
-
-```json
-{
-  "id": "nyc-session-40425704-1",
-  "cityId": "nyc",
-  "type": "SessionDocument",
-  "programId": "nyc-prog-40425704-beginner",
-  "providerId": "nyc-provider-doe",
-  "locationId": "nyc-loc-40425704",
-  "startDate": "2026-06-15",
-  "endDate": "2026-08-10",
-  "daysOfWeek": [1, 3, 5],
-  "timeOfDay": {
-    "start": "17:00",
-    "end": "18:00"
-  },
-  "price": {
-    "amount": 75,
-    "currency": "USD"
-  },
-  "capacity": 20,
-  "enrolled": 8,
-  "availableSpots": 12,
-  "registrationOpen": true,
-  "registrationUrl": "https://www.schools.nyc.gov/enrollment",
-  "searchTerms": "beginner swim lessons nyc doe",
-  "geographyIds": ["brooklyn"],
-  "confidence": "medium",
-  "sourceSystem": "csv-import"
-}
-```
-
----
-
-## 🎯 **After Loading Sessions**
-
-### **Search Will Work End-to-End:**
-
-**User searches:**
-- Age: 5 years old
-- Days: Weekends
-- Borough: Brooklyn
-
-**Returns:**
-- Weekend Beginner at Abraham Lincoln H.S.
-- Saturday, 9:00-10:00 AM
-- $90 for 8 weeks
-- 10 spots available
-
-**User clicks "Sign Up"** → Goes to registration URL ✅
-
----
-
-## 📋 **Quick Reference**
-
-### **Load Template Sessions:**
-```powershell
-npm run seed:nyc
-```
-
-### **Load Custom CSV:**
 ```powershell
 npx tsx scripts/load-sessions.ts data/my-sessions.csv
 ```
 
-### **Reseed Staging NYC Data:**
+Any custom CSV still has to use stable facility ids that exist in the canonical facility artifact.
+
+## Staging Load
+
+Once Azure is writable again:
+
 ```powershell
-az login
+npm run validate:seed:nyc
 npm run seed:staging:nyc
 ```
 
-### **Verify in Cosmos DB:**
-```
-Azure Portal → Cosmos DB → Data Explorer
-Filter: type = "SessionDocument"
-```
-
-### **Test Search API:**
-```powershell
-curl -X POST https://func-swim-r5bmpt.azurewebsites.net/api/search -H "Content-Type: application/json" -d '{\"cityId\":\"nyc\",\"filters\":{\"skillLevel\":[\"beginner\"]}}'
-```
-
----
-
-## 🎊 **Summary**
-
-**Created:**
-- ✅ CSV template with 144 example sessions across 24 canonical facilities
-- ✅ Loading script (load-sessions.ts)
-- ✅ Complete field reference guide
-
-**You can:**
-- ✅ Load example data now (immediate demo)
-- ✅ Research real schedules later (production data)
-- ✅ Add more sessions anytime (expand coverage)
-
-**Ready to load:**
-```powershell
-npm run seed:nyc
-```
-
-**Takes 1 minute, adds 144 searchable sessions across 24 pools!** 🏊
-
----
-
-## 💡 **Recommendation**
-
-**Load the template now** for immediate functionality:
+Follow that with live smoke validation:
 
 ```powershell
-npm run seed:nyc
+npm run smoke:staging -- https://ambitious-mud-07c32a410.1.azurestaticapps.net
 ```
 
-**Then this week:**
-1. Research real schedules for 3-5 priority facilities
-2. Update CSV with real data
-3. Re-run script to update sessions
-4. Launch pilot!
+See `EXECUTION_LOG.md` for the current blocked status and the exact first post-reset sequence.
 
-**Want to load the template sessions now?** ✅
+## Editing the Session Template
+
+`data/sessions-template.csv` columns:
+
+- `facility_id`
+- `program_name`
+- `skill_level`
+- `age_min_months`
+- `age_max_months`
+- `start_date`
+- `end_date`
+- `days_of_week`
+- `time_start`
+- `time_end`
+- `price`
+- `capacity`
+- `enrolled`
+- `registration_url`
+- `notes`
+
+Rules:
+
+- `facility_id` must match a canonical `sourceFacilityId`
+- keep dates in `YYYY-MM-DD`
+- keep times in `HH:MM` 24-hour format
+- keep `days_of_week` as comma-separated day codes (`0` = Sunday through `6` = Saturday)
+- treat `notes` as parent-facing descriptive context, not internal-only comments
+
+If you intentionally change the deterministic baseline, update:
+
+- `data/sessions-template.csv`
+- `scripts/validate-nyc-seed-data.mjs`
+- `docs/architecture/ORCHESTRATION-TRACKER.md`
+- any smoke or runbook text that depends on the current baseline
+
+## Facility Reference Refresh
+
+The provided Tableau workbook is a facility/inspection source, not a lesson schedule source.
+
+Use the facility-reference builder when refreshing the canonical artifact:
+
+```powershell
+python scripts/build-nyc-facility-reference.py `
+  --input "C:\Users\bergi\Downloads\Specific NYC Pool Data.twbx" `
+  --output data/nyc-facilities-canonical.json `
+  --csv-output data/nyc-facilities-canonical.csv
+```
+
+Then re-run:
+
+```powershell
+npm run validate:seed:nyc
+```
+
+Related docs:
+
+- `docs/architecture/FACILITY-REFERENCE-CONTRACT.md`
+- `docs/operations/TABLEAU-TWBX-INGESTION-RUNBOOK.md`
+
+## Tomorrow-Morning Checklist
+
+After Azure billing resets and the subscription is writable again:
+
+1. `npm run validate:deployment-contract`
+2. `npm run validate:seed:nyc`
+3. `npm run build`
+4. `npm run build:functions:deploy`
+5. `npm run seed:staging:nyc`
+6. `npm run smoke:staging -- https://ambitious-mud-07c32a410.1.azurestaticapps.net`
+
+If staging still fails before smoke, stop and capture the Azure-side error rather than repeatedly retrying writes.
