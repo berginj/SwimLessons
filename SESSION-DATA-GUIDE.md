@@ -23,6 +23,40 @@ That means staging can be restored to a known 10-session baseline without manual
 
 ---
 
+## 📥 **Tableau TWBX Ingestion Path**
+
+If your source is a Tableau packaged workbook (`.twbx`) such as:
+
+- `C:\Users\bergi\Downloads\Specific NYC Pool Data.twbx`
+
+use the TWBX converter first, then load the generated canonical CSV:
+
+```bash
+node scripts/ingest-tableau-twbx.mjs --input "<path-to-file.twbx>" --output data/sessions-from-tableau.csv
+npx tsx scripts/load-sessions.ts data/sessions-from-tableau.csv
+```
+
+Full runbook:
+
+- `docs/operations/TABLEAU-TWBX-INGESTION-RUNBOOK.md`
+
+Important validation note:
+
+- The provided `Specific NYC Pool Data.twbx` was validated locally on 2026-04-02.
+- It contains a Tableau `.hyper` extract backed by a workbook sheet named `NYC_Pool_Insp_7-2025 Workin (2)`.
+- Its columns are facility/inspection-oriented (`ACCELA`, `Facility_Name`, `Inspection_Date`, address, borough, violations).
+- It does not contain the session/program schedule fields required to produce canonical session seed rows safely.
+- Do not turn that workbook directly into session data by defaulting missing program names, dates, or times; export or provide a schedule-level dataset first.
+
+Critical data-model note:
+
+- treat that workbook as facility reference data, not session seed data
+- facility data changes infrequently and should be refreshed on a slower cadence
+- session data changes rapidly and should be ingested separately
+- session rows should crosswalk back to the facility layer using a stable facility identifier such as `ACCELA` / permit id
+
+---
+
 ## 📋 **Template Overview**
 
 **File:** `data/sessions-template.csv`

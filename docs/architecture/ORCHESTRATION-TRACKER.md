@@ -1,7 +1,7 @@
 # Orchestration Tracker
 
 **Purpose:** Canonical pullable handoff for agents working on the NYC MVP
-**Last Updated:** 2026-03-27
+**Last Updated:** 2026-04-02
 **Status:** Active
 
 ---
@@ -162,6 +162,9 @@ Scoring formula:
 - Operator tooling is now considered sufficient for MVP; do not treat a hosted dashboard as an active backlog item without new user direction
 - Parent-facing travel copy now distinguishes live route, schedule-based estimate, and fallback estimate so transit confidence is explicit in both search results and session details
 - `integration-flows.md`, `CONTRACT-SUMMARY.md`, and `README.md` were trimmed to stop presenting deferred onboarding/data-sync flows as live NYC MVP truth
+- Added a Tableau TWBX-to-canonical session CSV ingestion path and runbook so external NYC pool datasets can be transformed into the existing deterministic loader format without changing endpoint contracts
+- Validated the provided `Specific NYC Pool Data.twbx` workbook and confirmed it is facility/inspection-oriented (`ACCELA`, `Facility_Name`, `Inspection_Date`, address, borough, violations) with overlap against the current NYC facility sample IDs, but it lacks lesson schedule/program fields and cannot be ingested directly into canonical session seed rows without a separate session-level export
+- The current ingestion boundary is now explicit: facility datasets are slow-changing reference/crosswalk sources, while session datasets are separate fast-changing feeds that must link back to facilities by stable identifiers such as `ACCELA` or permit id
 
 ### Workflow/Code Areas Requiring Re-Review
 
@@ -172,6 +175,7 @@ Scoring formula:
 - `src/services/transit/transit-service.ts`
 - `src/functions/telemetry-api/events.ts`
 - `src/web/telemetry.js`
+- `scripts/ingest-tableau-twbx.mjs`
 
 ---
 

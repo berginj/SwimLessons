@@ -10,6 +10,7 @@
     "build:watch": "tsc --watch",
     "deploy:transit:staging": "node scripts/deploy-staging-transit-router.mjs",
     "seed:nyc": "tsx scripts/load-sessions.ts data/sessions-template.csv",
+    "seed:nyc:from-tableau": "node scripts/ingest-tableau-twbx.mjs",
     "seed:staging:nyc": "node scripts/seed-staging-nyc.mjs",
     "operator:city-dashboard": "node scripts/operator-city-dashboard.mjs",
     "operator:city-stats": "node scripts/operator-city-stats.mjs",
