@@ -23,6 +23,25 @@ That means staging can be restored to a known 10-session baseline without manual
 
 ---
 
+## 📥 **Tableau TWBX Ingestion Path**
+
+If your source is a Tableau packaged workbook (`.twbx`) such as:
+
+- `C:\Users\bergi\Downloads\Specific NYC Pool Data.twbx`
+
+use the TWBX converter first, then load the generated canonical CSV:
+
+```bash
+node scripts/ingest-tableau-twbx.mjs --input "<path-to-file.twbx>" --output data/sessions-from-tableau.csv
+npx tsx scripts/load-sessions.ts data/sessions-from-tableau.csv
+```
+
+Full runbook:
+
+- `docs/operations/TABLEAU-TWBX-INGESTION-RUNBOOK.md`
+
+---
+
 ## 📋 **Template Overview**
 
 **File:** `data/sessions-template.csv`

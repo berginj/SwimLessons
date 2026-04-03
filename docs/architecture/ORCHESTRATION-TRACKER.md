@@ -162,6 +162,7 @@ Scoring formula:
 - Operator tooling is now considered sufficient for MVP; do not treat a hosted dashboard as an active backlog item without new user direction
 - Parent-facing travel copy now distinguishes live route, schedule-based estimate, and fallback estimate so transit confidence is explicit in both search results and session details
 - `integration-flows.md`, `CONTRACT-SUMMARY.md`, and `README.md` were trimmed to stop presenting deferred onboarding/data-sync flows as live NYC MVP truth
+- Added a Tableau TWBX-to-canonical session CSV ingestion path and runbook so external NYC pool datasets can be transformed into the existing deterministic loader format without changing endpoint contracts
 
 ### Workflow/Code Areas Requiring Re-Review
 
@@ -172,6 +173,7 @@ Scoring formula:
 - `src/services/transit/transit-service.ts`
 - `src/functions/telemetry-api/events.ts`
 - `src/web/telemetry.js`
+- `scripts/ingest-tableau-twbx.mjs`
 
 ---
 
