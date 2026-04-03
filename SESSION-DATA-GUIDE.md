@@ -4,7 +4,7 @@
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `data/sessions-template.csv` | Pre-filled template with 10 example sessions | 11 |
+| `data/sessions-template.csv` | Pre-filled template with 144 example sessions across 24 canonical facilities | 145 |
 | `scripts/load-sessions.ts` | Script to load sessions from CSV | 200 |
 | `SESSION-DATA-GUIDE.md` | This guide - how to use templates | - |
 
@@ -19,7 +19,7 @@ The loader is now self-contained for the NYC MVP seed path:
 - It upserts the related location and program documents needed by search and session-details
 - It can reseed staging directly with `npm run seed:staging:nyc` after `az login`
 
-That means staging can be restored to a known 10-session baseline without manual Cosmos edits.
+That means staging can be restored to a known 144-session baseline without manual Cosmos edits.
 
 ---
 
@@ -61,20 +61,18 @@ Critical data-model note:
 
 **File:** `data/sessions-template.csv`
 
-**Contains 10 example sessions** for the top 5 NYC facilities:
+**Contains 144 example sessions** across **24 canonical NYC facilities**.
 
-| Facility | Program | Days | Time | Price | Spots |
-|----------|---------|------|------|-------|-------|
-| **Brooklyn Tech** | Beginner | Mon/Wed/Fri | 5:00-6:00 PM | $75 | 12/20 |
-| **Brooklyn Tech** | Intermediate | Tue/Thu | 4:30-5:30 PM | $85 | 3/15 |
-| **Abraham Lincoln** | Weekend Beginner | Saturday | 9:00-10:00 AM | $90 | 10/25 |
-| **Abraham Lincoln** | Advanced Youth | Saturday | 10:30-11:30 AM | $95 | 4/12 |
-| **George Washington** | Morning Beginner | Mon/Wed/Fri | 8:00-9:00 AM | $70 | 15/20 |
-| **George Washington** | Evening Intermediate | Tue/Thu | 6:00-7:00 PM | $80 | 8/18 |
-| **Bayside HS** | Weekend Beginner | Sunday | 10:00-11:00 AM | $85 | 8/20 |
-| **Bayside HS** | Weekday Intermediate | Mon/Wed/Fri | 4:00-5:00 PM | $90 | 6/15 |
-| **Truman HS** | Summer Swim | Tue/Thu | 3:30-4:30 PM | $65 | 7/25 |
-| **Truman HS** | Advanced Teen | Mon/Wed/Fri | 5:00-6:00 PM | $85 | 5/12 |
+Each facility now has **6 lesson choices** spanning:
+
+| Track | Skill | Typical schedule | Typical age range |
+|----------|---------|------|-------|
+| **Water Confidence** | beginner | weekday late afternoon | 3-6 years |
+| **Water Confidence** | beginner | Saturday morning | 3-6 years |
+| **Stroke Builder** | intermediate | Tue/Thu after school | 6-11 years |
+| **Stroke Builder** | intermediate | Sunday late morning | 6-11 years |
+| **Teen Technique** | advanced | weekday evening | 9-15 years |
+| **Family Swim Sampler** | all | Friday early evening | 2-10 years |
 
 **These are EXAMPLES** - Edit with real data from school websites!
 
@@ -91,8 +89,8 @@ npm run seed:nyc
 ```
 
 **Result:**
-- ✅ 10 sessions loaded
-- ✅ 5 facilities have swim programs
+- ✅ 144 sessions loaded
+- ✅ 24 canonical facilities have swim programs
 - ✅ Ready to demo immediately
 - ⚠️ Data is example (not real schedules)
 
@@ -102,7 +100,9 @@ npm run seed:nyc
 
 **Step 1: Research Each Facility**
 
-**For each of the 5 facilities, find:**
+**For each facility you want to replace with real schedules, find:**
+
+The deterministic template already covers all canonical locations in `data/nyc-pools-sample.csv`, so you do not need to start from an empty shell. A practical first pass is to replace the highest-priority facilities first.
 
 **Brooklyn Tech H.S. (40425704):**
 - Google: "Brooklyn Tech High School swim program"
@@ -116,11 +116,7 @@ npm run seed:nyc
 - ✅ Registration URL
 - ✅ How many spots available
 
-**Repeat for:**
-- Abraham Lincoln H.S. (40425705)
-- George Washington H.S. (40425724)
-- Bayside High School (40425700)
-- Harry S. Truman H.S. (40425714)
+**Then repeat for additional facilities listed in `data/nyc-pools-sample.csv`** until the example schedules have been replaced with real ones.
 
 ---
 
@@ -295,7 +291,7 @@ cat data/nyc-pools-sample.csv | cut -d',' -f2
 npm run seed:nyc
 ```
 
-**This loads 10 example sessions** so you can:
+**This loads 144 example sessions across 24 canonical facilities** so you can:
 - ✅ Test search functionality
 - ✅ See how sessions appear in UI
 - ✅ Demo to stakeholders
@@ -395,7 +391,7 @@ curl -X POST https://func-swim-r5bmpt.azurewebsites.net/api/search -H "Content-T
 ## 🎊 **Summary**
 
 **Created:**
-- ✅ CSV template with 10 example sessions
+- ✅ CSV template with 144 example sessions across 24 canonical facilities
 - ✅ Loading script (load-sessions.ts)
 - ✅ Complete field reference guide
 
@@ -409,7 +405,7 @@ curl -X POST https://func-swim-r5bmpt.azurewebsites.net/api/search -H "Content-T
 npm run seed:nyc
 ```
 
-**Takes 1 minute, adds 10 searchable sessions!** 🏊
+**Takes 1 minute, adds 144 searchable sessions across 24 pools!** 🏊
 
 ---
 
@@ -422,7 +418,7 @@ npm run seed:nyc
 ```
 
 **Then this week:**
-1. Research real schedules for 2-3 facilities
+1. Research real schedules for 3-5 priority facilities
 2. Update CSV with real data
 3. Re-run script to update sessions
 4. Launch pilot!

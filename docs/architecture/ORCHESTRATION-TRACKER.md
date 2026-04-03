@@ -51,7 +51,7 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Search results and session details now surface program age range and age-fit context when provider age bounds are available
 - Search quality scoring now uses provider/program/session signals instead of session confidence alone
 - `SearchRequest.userContext.sessionId` is now optional and aligned with the current browser request shape
-- Current user-visible blocker: none critical in staging; the next meaningful gaps are richer parent-facing session clarity beyond age fit and keeping browser-origin coverage aligned with UI changes
+- Current staging verification blocker on `2026-04-02`: the Azure subscription is read-only (`ReadOnlyDisabledSubscription`) and `func-swim-stg01c` reports `state: AdminDisabled`, so the tracked staging URL currently returns `404` and cannot be reseeded or revalidated until the environment is re-enabled
 
 ---
 
@@ -97,7 +97,7 @@ Note:
   - Function App app settings for transit router
 
 Current gaps:
-- no critical parent-visible blocker in the current NYC MVP slice; the next likely improvement is richer session/provider clarity once age fit and transit trust are in place
+- the current codebase can support a denser deterministic NYC seed, but staging cannot currently be reseeded or revalidated because the Azure subscription is read-only and the staging Function App is admin-disabled as of `2026-04-02`
 - the remaining architecture summary docs still need periodic spot-checks so they do not drift back toward planning-era assumptions
 
 ---
@@ -165,6 +165,8 @@ Scoring formula:
 - Added a Tableau TWBX-to-canonical session CSV ingestion path and runbook so external NYC pool datasets can be transformed into the existing deterministic loader format without changing endpoint contracts
 - Validated the provided `Specific NYC Pool Data.twbx` workbook and confirmed it is facility/inspection-oriented (`ACCELA`, `Facility_Name`, `Inspection_Date`, address, borough, violations) with overlap against the current NYC facility sample IDs, but it lacks lesson schedule/program fields and cannot be ingested directly into canonical session seed rows without a separate session-level export
 - The current ingestion boundary is now explicit: facility datasets are slow-changing reference/crosswalk sources, while session datasets are separate fast-changing feeds that must link back to facilities by stable identifiers such as `ACCELA` or permit id
+- The local deterministic NYC session seed now covers all 24 canonical sample facilities with 6 example lesson sessions each (144 total) so the parent-facing experience no longer dead-ends around only 5 seeded pools when the dataset is refreshed
+- Staging revalidation is currently blocked because `npm run seed:staging:nyc` fails against a read-only Azure subscription and the linked staging Function App `func-swim-stg01c` is `AdminDisabled`, which leaves the tracked staging site returning `404` as of `2026-04-02`
 
 ### Workflow/Code Areas Requiring Re-Review
 
@@ -176,6 +178,7 @@ Scoring formula:
 - `src/functions/telemetry-api/events.ts`
 - `src/web/telemetry.js`
 - `scripts/ingest-tableau-twbx.mjs`
+- `data/sessions-template.csv`
 
 ---
 
