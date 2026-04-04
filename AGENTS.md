@@ -51,6 +51,68 @@ Rules:
 - If a contract is missing or ambiguous, stop, narrow the ambiguity, and update the contract or ask for approval.
 - If a change would materially alter the parent journey, get human approval first.
 
+## Mission
+
+Deliver correct, reviewable improvements that align to existing contracts, personas, and architecture decisions.
+
+## Before changing anything
+
+1. Read this file, the nearest nested AGENTS.md/override, relevant README sections, current contract docs, persona docs, and ADRs for the touched area.
+2. If an existing contract governs the work, align to it. Do not silently diverge.
+3. For medium+ tasks, create and maintain a lightweight action list with statuses: pending / in_progress / done / blocked / deferred.
+4. Treat the task as incomplete until every requested item is done or explicitly marked blocked/deferred with a reason.
+
+## Execution rules
+
+1. Make one focused improvement at a time.
+2. Run the smallest relevant verification after each meaningful change:
+   - repro steps for bug fixes
+   - targeted tests
+   - lint/type checks if relevant
+   - pre-commit checks if configured
+3. Do not stop early if another read, search, or command is likely to improve correctness or completeness.
+4. Do not guess when missing context is retrievable; read the source docs/files first.
+
+## Contract and documentation rules
+
+1. If work changes setup, usage, public behavior, env vars, or operator steps, update README.md in the same change.
+2. If work changes architecture, Azure resources, identity, security posture, or cost model, create/update an ADR.
+3. If work is multi-file, compliance-sensitive, or changes user workflow, create/update docs/contracts/current.md.
+4. If you discover non-blocking improvements, add them to docs/recommendations.md.
+5. If the same mistake occurs twice, update AGENTS.md or the nearest scoped override.
+
+## Persona rules
+
+1. Use docs/personas.md as an acceptance target, not background flavor text.
+2. For each meaningful change, state which persona outcome improved or why the change is persona-neutral.
+3. Prefer changes that improve usability, clarity, safety, or task completion for the primary persona.
+
+## Git hygiene
+
+1. After each meaningful validated run, create one small focused commit.
+2. Push the commit to the working branch unless the repo policy forbids it or the change is still clearly mid-refactor.
+3. Never bundle unrelated changes in the same commit.
+
+## Azure rules
+
+1. Prefer managed identity over embedded secrets.
+2. Minimize privilege and document identity decisions.
+3. Do not add Azure services without an ADR covering purpose, alternatives, cost, security, and operations.
+4. Ensure resources are tagged with owner, app, env, and cost center where applicable.
+5. Recommend budgets/alerts for new cost-bearing resources.
+6. Recommend auto-shutdown or equivalent controls for non-prod compute where applicable.
+
+## Final response requirements
+
+1. Report:
+   - completed items
+   - blocked/deferred items
+   - files changed
+   - verification run
+   - contract/docs updated
+   - remaining risks
+2. If no contract/doc update was needed, say so explicitly.
+
 ## Current MVP Reality
 
 As of 2026-03-26, the repo is not in “foundation only” mode anymore. The live NYC MVP baseline is:
