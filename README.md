@@ -76,7 +76,9 @@ npm run seed:staging:nyc
 
 ## Browser-Origin and Transit
 
+- the landing view loads 5 latest available pool options by default before a manual search
 - search defaults to Times Square when no browser origin is available
+- the Times Square fallback explanation now lives behind the info hover next to `Use browser location`
 - geolocation is opt-in and should never auto-prompt on page load
 - search results and session details must degrade cleanly if router-backed transit is unavailable
 - top-10 search results receive transit enrichment; session details also compute travel time

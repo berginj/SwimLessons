@@ -20,6 +20,7 @@ const searchResults = [
       availableSpots: 15,
       registrationUrl: 'https://example.com/signup',
       price: { amount: 70, currency: 'USD' },
+      createdAt: '2026-04-03T12:00:00.000Z',
     },
     provider: {
       id: 'provider-1',
@@ -65,6 +66,7 @@ const ageFilteredSearchResults = [
       availableSpots: 15,
       registrationUrl: 'https://example.com/signup',
       price: { amount: 70, currency: 'USD' },
+      createdAt: '2026-04-02T12:00:00.000Z',
     },
     provider: {
       id: 'provider-1',
@@ -192,8 +194,8 @@ async function registerApiMocks(
         data: {
           results,
           pagination: {
-            skip: 0,
-            take: 20,
+            skip: requestBody?.pagination?.skip ?? 0,
+            take: requestBody?.pagination?.take ?? results.length,
             total: results.length,
             hasMore: false,
           },
@@ -244,6 +246,23 @@ function getTelemetryEvents(capturedTelemetryRequests) {
   );
 }
 
+function expectLandingRequest(requestBody) {
+  expect(requestBody).toMatchObject({
+    cityId: 'nyc',
+    filters: {
+      onlyAvailable: true,
+    },
+    sort: {
+      field: 'createdAt',
+      direction: 'desc',
+    },
+    pagination: {
+      skip: 0,
+      take: 5,
+    },
+  });
+}
+
 test.describe('browser location transit regression', () => {
   test('sends child age through the browser search flow', async ({ page }) => {
     const capturedSearchBodies: any[] = [];
@@ -264,6 +283,13 @@ test.describe('browser location transit regression', () => {
 
     await page.goto('/');
 
+    await expect.poll(() => capturedSearchBodies.length).toBe(1);
+    expectLandingRequest(capturedSearchBodies[0]);
+    await expect(page.getByText('Showing 1 latest available pool option')).toBeVisible();
+    await page.getByRole('button', { name: 'Travel time defaults info' }).hover();
+    await expect(page.getByRole('tooltip')).toContainText(
+      'Travel times default to Times Square until you ask the browser for your current location.'
+    );
     await expect(page.getByText(/Using Times Square as the travel-time starting point/i)).toBeVisible();
     await page.getByLabel('Child age').selectOption('60');
     await page.getByRole('button', { name: 'Search sessions' }).click();
@@ -323,6 +349,9 @@ test.describe('browser location transit regression', () => {
 
       await page.goto('/');
 
+      await expect.poll(() => capturedSearchBodies.length).toBe(1);
+      expectLandingRequest(capturedSearchBodies[0]);
+      await expect(page.getByText('Showing 1 latest available pool option')).toBeVisible();
       await expect(page.getByText(/Using Times Square as the travel-time starting point/i)).toBeVisible();
       await expect(page.getByRole('button', { name: 'Use browser location' })).toBeVisible();
 
@@ -337,6 +366,7 @@ test.describe('browser location transit regression', () => {
 
       const latestSearchBody = capturedSearchBodies.at(-1);
       expect(latestSearchBody?.userContext?.origin).toEqual(browserOrigin);
+      expectLandingRequest(latestSearchBody);
 
       await page.getByRole('button', { name: 'View details' }).click();
 
@@ -435,8 +465,9 @@ test.describe('browser location transit regression', () => {
 
     await page.goto('/');
 
+    await expect.poll(() => capturedSearchBodies.length).toBe(1);
+    expectLandingRequest(capturedSearchBodies[0]);
     await expect(page.getByText(/Using Times Square as the travel-time starting point/i)).toBeVisible();
-    expect(capturedSearchBodies).toHaveLength(1);
     expect(capturedSearchBodies[0]?.userContext).toBeUndefined();
 
     await page.getByRole('button', { name: 'Use browser location' }).click();

@@ -99,7 +99,7 @@ export interface CitySearchProfile {
   noResultsFallback: NoResultsFallbackConfig;
 }
 
-export type SortField = "distance" | "startDate" | "price" | "availability";
+export type SortField = "distance" | "startDate" | "price" | "availability" | "createdAt";
 
 export interface SearchFilters {
   cityId: string;
@@ -113,6 +113,7 @@ export interface SearchFilters {
   priceMax?: number;
   skillLevel?: SkillLevel[];
   facilityType?: FacilityType[];
+  onlyAvailable?: boolean;
   origin?: Coordinates;              // User location (never stored)
 }
 

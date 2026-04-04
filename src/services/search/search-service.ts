@@ -330,6 +330,12 @@ export class SearchService implements ISearchService {
         }
       }
 
+      if (filters.onlyAvailable) {
+        if (!Number.isFinite(session.availableSpots) || (session.availableSpots || 0) <= 0) {
+          return false;
+        }
+      }
+
       return true;
     });
   }
@@ -628,6 +634,11 @@ export class SearchService implements ISearchService {
           const availA = a.session.availableSpots ?? 0;
           const availB = b.session.availableSpots ?? 0;
           comparison = availB - availA; // Higher availability first
+          break;
+
+        case 'createdAt':
+          comparison =
+            new Date(a.session.createdAt).getTime() - new Date(b.session.createdAt).getTime();
           break;
 
         default:

@@ -4,6 +4,7 @@ const API_BASE = window.SWIM_API_BASE_URL || '/api';
 const DEFAULT_TRANSIT_ORIGIN_LABEL = 'Times Square';
 const DEFAULT_TRANSIT_ORIGIN = { latitude: 40.758, longitude: -73.9855 };
 const BROWSER_TRANSIT_ORIGIN_LABEL = 'your current location';
+const LANDING_RESULTS_LIMIT = 5;
 
 const DAY_OPTIONS = [
   { value: 0, label: 'Sun' },
@@ -35,6 +36,7 @@ const demoStore = {
     {
       id: 'nyc-session-1',
       cityId: 'nyc',
+      createdAt: '2026-03-28T12:00:00.000Z',
       programName: 'Beginner Swim Lessons',
       providerName: 'NYC Parks & Recreation',
       locationName: 'Hamilton Fish Pool',
@@ -60,6 +62,7 @@ const demoStore = {
     {
       id: 'nyc-session-2',
       cityId: 'nyc',
+      createdAt: '2026-03-29T12:00:00.000Z',
       programName: 'Weekend Preschool Swim',
       providerName: 'YMCA Brooklyn',
       locationName: 'Prospect Park YMCA',
@@ -85,6 +88,7 @@ const demoStore = {
     {
       id: 'nyc-session-3',
       cityId: 'nyc',
+      createdAt: '2026-03-30T12:00:00.000Z',
       programName: 'Intermediate School Age',
       providerName: 'JCC Manhattan',
       locationName: 'JCC Manhattan Pool',
@@ -110,6 +114,7 @@ const demoStore = {
     {
       id: 'nyc-session-4',
       cityId: 'nyc',
+      createdAt: '2026-03-31T12:00:00.000Z',
       programName: 'Evening Advanced Track',
       providerName: 'Asphalt Green',
       locationName: 'Asphalt Green Aquatics',
@@ -135,6 +140,7 @@ const demoStore = {
     {
       id: 'nyc-session-5',
       cityId: 'nyc',
+      createdAt: '2026-04-01T12:00:00.000Z',
       programName: 'Queens Family Swim Starter',
       providerName: 'Elite Swim Academy',
       locationName: 'Astoria Swim Lab',
@@ -166,6 +172,8 @@ const state = {
   cities: [],
   results: [],
   activeChildAgeMonths: null,
+  lastSearchPreset: 'standard',
+  hasSubmittedSearch: false,
   routingOrigin: DEFAULT_TRANSIT_ORIGIN,
   routingOriginLabel: DEFAULT_TRANSIT_ORIGIN_LABEL,
   routingOriginSource: 'default',
@@ -175,7 +183,6 @@ const state = {
 
 const elements = {
   apiStatus: document.getElementById('api-status'),
-  travelNote: document.getElementById('travel-note'),
   originStatus: document.getElementById('origin-status'),
   useBrowserLocation: document.getElementById('use-browser-location'),
   resetOrigin: document.getElementById('reset-origin'),
@@ -209,7 +216,7 @@ async function init() {
   // TRACK: Page loaded
   telemetry.trackPageLoaded(state.mode);
 
-  await handleSearch();
+  await runSearch({ trigger: 'initial' });
 }
 
 function setupOriginControls() {
@@ -243,12 +250,6 @@ function getRoutingOriginLabel() {
 function renderOriginControls() {
   const geolocationSupported = browserLocationSupported();
   const usingBrowserLocation = hasBrowserRoutingOrigin();
-
-  if (elements.travelNote) {
-    elements.travelNote.textContent = usingBrowserLocation
-      ? 'Travel times are using your browser-provided location for this session.'
-      : 'Travel times default to Times Square until you ask the browser for your current location.';
-  }
 
   if (elements.useBrowserLocation) {
     elements.useBrowserLocation.disabled = !geolocationSupported || state.locationRequestPending;
@@ -323,7 +324,7 @@ async function handleUseBrowserLocation() {
     state.routingOriginSource = 'browser';
     telemetry.trackGeolocationGranted();
     renderOriginControls();
-    await handleSearch();
+    await runSearch({ trigger: 'origin-update' });
   } catch (error) {
     const reason = getGeolocationErrorReason(error);
     state.routingOrigin = DEFAULT_TRANSIT_ORIGIN;
@@ -333,7 +334,7 @@ async function handleUseBrowserLocation() {
     telemetry.trackGeolocationDenied(reason);
     renderOriginControls();
     if (hadBrowserOrigin) {
-      await handleSearch();
+      await runSearch({ trigger: 'origin-update' });
     }
   } finally {
     state.locationRequestPending = false;
@@ -347,7 +348,7 @@ async function handleResetOrigin() {
   state.routingOriginSource = 'default';
   state.locationError = '';
   renderOriginControls();
-  await handleSearch();
+  await runSearch({ trigger: 'origin-update' });
 }
 
 function requestBrowserLocation() {
@@ -411,6 +412,12 @@ async function detectApiMode() {
   }
 }
 
+function getDefaultCityId() {
+  return state.cities.some((city) => city.cityId === 'nyc')
+    ? 'nyc'
+    : (state.cities[0]?.cityId || '');
+}
+
 function setMode(mode, label) {
   state.mode = mode;
   elements.apiStatus.textContent = label;
@@ -422,11 +429,7 @@ function renderCityOptions() {
     .map((city) => `<option value="${city.cityId}">${escapeHtml(city.displayName)}</option>`)
     .join('');
 
-  const preferredCityId = state.cities.some((city) => city.cityId === 'nyc')
-    ? 'nyc'
-    : (state.cities[0]?.cityId || '');
-
-  elements.cityId.value = preferredCityId;
+  elements.cityId.value = getDefaultCityId();
 }
 
 function renderDayChips() {
@@ -452,14 +455,20 @@ function renderDayChips() {
 
 async function handleSearch(event) {
   event?.preventDefault();
+  state.hasSubmittedSearch = true;
+  await runSearch({ trigger: 'submit' });
+}
+
+async function runSearch({ trigger = 'submit' } = {}) {
   const searchStartTime = performance.now();
+  const preset = getSearchPreset(trigger);
+  const requestBody = buildSearchRequest({ preset });
+
+  state.lastSearchPreset = preset;
+  state.activeChildAgeMonths = requestBody.filters.childAge ?? null;
 
   elements.summary.textContent = 'Searching...';
   elements.results.innerHTML = '<div class="loading-note">Looking for sessions.</div>';
-
-  // Build filters for tracking
-  const requestBody = buildSearchRequest();
-  state.activeChildAgeMonths = requestBody.filters.childAge ?? null;
 
   // TRACK: Search started
   telemetry.trackSearchStarted({
@@ -469,7 +478,9 @@ async function handleSearch(event) {
   });
 
   try {
-    const results = state.mode === 'live' ? await searchLiveApi() : searchDemoData();
+    const results = state.mode === 'live'
+      ? await searchLiveApi(requestBody)
+      : searchDemoData(requestBody);
     state.results = results;
 
     const executionTime = performance.now() - searchStartTime;
@@ -490,13 +501,12 @@ async function handleSearch(event) {
     telemetry.trackError('SearchAPIError', error.message, 'search');
 
     setMode('demo', 'Demo fallback');
-    state.results = searchDemoData();
+    state.results = searchDemoData(requestBody);
     renderResults(state.results);
   }
 }
 
-async function searchLiveApi() {
-  const requestBody = buildSearchRequest();
+async function searchLiveApi(requestBody = buildSearchRequest()) {
   const payload = await fetchApi('/search', {
     method: 'POST',
     headers: {
@@ -513,7 +523,7 @@ async function searchLiveApi() {
   return results;
 }
 
-function buildSearchRequest() {
+function buildSearchRequest({ preset = 'standard' } = {}) {
   const filters = {};
   const childAge = Number(elements.childAge.value);
   const priceMax = Number(elements.priceMax.value);
@@ -540,14 +550,25 @@ function buildSearchRequest() {
     filters.priceMax = priceMax;
   }
 
+  if (preset === 'landing') {
+    filters.onlyAvailable = true;
+  }
+
   const requestBody = {
     cityId: elements.cityId.value || 'nyc',
     filters,
     pagination: {
       skip: 0,
-      take: 20,
+      take: preset === 'landing' ? LANDING_RESULTS_LIMIT : 20,
     },
   };
+
+  if (preset === 'landing') {
+    requestBody.sort = {
+      field: 'createdAt',
+      direction: 'desc',
+    };
+  }
 
   if (hasBrowserRoutingOrigin()) {
     requestBody.userContext = {
@@ -558,15 +579,35 @@ function buildSearchRequest() {
   return requestBody;
 }
 
-function searchDemoData() {
-  const request = buildSearchRequest();
+function getSearchPreset(trigger) {
+  if (trigger === 'initial') {
+    return 'landing';
+  }
+
+  if (trigger === 'origin-update' && !state.hasSubmittedSearch && isSearchFormPristine()) {
+    return 'landing';
+  }
+
+  return 'standard';
+}
+
+function isSearchFormPristine() {
+  return (elements.cityId.value || getDefaultCityId()) === getDefaultCityId()
+    && !elements.childAge.value
+    && state.selectedDays.size === 0
+    && !elements.geography.value
+    && !elements.timeWindow.value
+    && !elements.priceMax.value;
+}
+
+function searchDemoData(request = buildSearchRequest()) {
   const childAge = request.filters.childAge;
   const geographyIds = request.filters.geographyIds || [];
   const daysOfWeek = request.filters.daysOfWeek || [];
   const timeWindow = request.filters.timeWindow;
   const priceMax = request.filters.priceMax;
-
-  return demoStore.sessions
+  const onlyAvailable = Boolean(request.filters.onlyAvailable);
+  const filteredSessions = demoStore.sessions
     .filter((session) => session.cityId === request.cityId)
     .filter((session) => {
       if (geographyIds.length > 0 && !session.geographyIds.some((value) => geographyIds.includes(value))) {
@@ -590,13 +631,57 @@ function searchDemoData() {
         return false;
       }
 
+      if (onlyAvailable && (!Number.isFinite(session.availableSpots) || session.availableSpots <= 0)) {
+        return false;
+      }
+
       if (Number.isFinite(childAge) && childAge > 0 && !isAgeEligibleForSession(session, childAge)) {
         return false;
       }
 
       return true;
-    })
+    });
+
+  return sortDemoSessions(filteredSessions, request.sort)
+    .slice(request.pagination?.skip || 0, (request.pagination?.skip || 0) + (request.pagination?.take || 20))
     .map(createDemoSearchResult);
+}
+
+function sortDemoSessions(sessions, sort) {
+  if (!sort?.field) {
+    return [...sessions];
+  }
+
+  const sorted = [...sessions];
+  sorted.sort((left, right) => {
+    let comparison = 0;
+
+    switch (sort.field) {
+      case 'createdAt':
+        comparison = new Date(left.createdAt || 0).getTime() - new Date(right.createdAt || 0).getTime();
+        break;
+      case 'startDate':
+        comparison = new Date(left.startDate || 0).getTime() - new Date(right.startDate || 0).getTime();
+        break;
+      case 'price':
+        comparison = (left.price || 0) - (right.price || 0);
+        break;
+      case 'availability':
+        comparison = (left.availableSpots || 0) - (right.availableSpots || 0);
+        break;
+      case 'distance':
+        comparison =
+          calculateHaversineDistance(getRoutingOrigin(), left.coordinates)
+          - calculateHaversineDistance(getRoutingOrigin(), right.coordinates);
+        break;
+      default:
+        comparison = 0;
+    }
+
+    return sort.direction === 'asc' ? comparison : -comparison;
+  });
+
+  return sorted;
 }
 
 function createDemoSearchResult(session) {
@@ -616,6 +701,7 @@ function createDemoSearchResult(session) {
       availableSpots: session.availableSpots,
       registrationUrl: session.registrationUrl,
       price: { amount: session.price, currency: 'USD' },
+      createdAt: session.createdAt,
     },
     provider: {
       id: session.providerId,
@@ -644,14 +730,20 @@ function createDemoSearchResult(session) {
 
 function renderResults(results) {
   if (results.length === 0) {
-    renderEmptyState('No sessions matched those filters. Try broadening the schedule or borough.');
+    renderEmptyState(
+      state.lastSearchPreset === 'landing'
+        ? 'No newly added pool options with open spots are available right now.'
+        : 'No sessions matched those filters. Try broadening the schedule or borough.'
+    );
     return;
   }
 
   const ageContext = formatChildAgeContext(state.activeChildAgeMonths);
-  elements.summary.textContent = `${results.length} session${results.length === 1 ? '' : 's'} found${
-    ageContext ? ` for ${ageContext}` : ''
-  }`;
+  elements.summary.textContent = state.lastSearchPreset === 'landing'
+    ? `Showing ${results.length} latest available pool option${results.length === 1 ? '' : 's'}`
+    : `${results.length} session${results.length === 1 ? '' : 's'} found${
+        ageContext ? ` for ${ageContext}` : ''
+      }`;
   elements.results.innerHTML = '';
 
   results.forEach((result, index) => {

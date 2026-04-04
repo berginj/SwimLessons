@@ -294,4 +294,52 @@ describe('SearchService', () => {
     ]);
     expect(scored[0]?.score).toBeGreaterThan(scored[1]?.score || 0);
   });
+
+  it('supports newest-available landing searches', async () => {
+    const cityConfig = createCityConfig();
+    const sessions = [
+      createSession({
+        id: 'session-old-open',
+        createdAt: '2026-03-20T00:00:00.000Z',
+        availableSpots: 3,
+      }),
+      createSession({
+        id: 'session-new-closed',
+        createdAt: '2026-03-28T00:00:00.000Z',
+        availableSpots: 0,
+      }),
+      createSession({
+        id: 'session-new-open',
+        createdAt: '2026-03-29T00:00:00.000Z',
+        availableSpots: 8,
+      }),
+    ];
+    const sessionRepository = createSessionRepository({
+      sessions,
+      programs: new Map<string, Program>([
+        ['program-1', createProgram({ id: 'program-1' })],
+      ]),
+      providers: new Map<string, Provider>([
+        ['provider-1', createProvider({ id: 'provider-1', verified: true })],
+      ]),
+      locations: new Map<string, Location>([
+        ['location-1', createLocation({ id: 'location-1' })],
+      ]),
+    });
+    const cityConfigService = {
+      getCityConfig: vi.fn().mockResolvedValue(cityConfig),
+    } as any;
+    const service = new SearchService(sessionRepository, cityConfigService);
+
+    const results = await service.search(
+      { cityId: 'nyc', onlyAvailable: true },
+      { field: 'createdAt', direction: 'desc' },
+      { skip: 0, take: 5 }
+    );
+
+    expect(results.results.map((session) => session.id)).toEqual([
+      'session-new-open',
+      'session-old-open',
+    ]);
+  });
 });

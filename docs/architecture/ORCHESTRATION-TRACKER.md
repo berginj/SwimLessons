@@ -1,7 +1,7 @@
 # Orchestration Tracker
 
 **Purpose:** Canonical pullable handoff for agents working on the NYC MVP
-**Last Updated:** 2026-04-03
+**Last Updated:** 2026-04-04
 **Status:** Active
 
 ---
@@ -33,12 +33,12 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Repo agent guidance: `AGENTS.md`
 - Parent persona contract: `docs/architecture/PARENT-PERSONA.md`
 - Transit-router contract: `docs/architecture/TRANSIT-ROUTER-CONTRACT.md`
-- Latest verified CI run: `23624500711` `CI Build` `success`
-- Latest verified staging deploy: `23624500695` `Deploy to Staging` `success`
+- Latest verified CI run: `23988327107` `CI Build` `success`
+- Latest verified staging deploy: `23988327104` `Deploy to Staging` `success`
 - Staging site: `https://ambitious-mud-07c32a410.1.azurestaticapps.net/`
-- Staging `/api/cities`: `success`, NYC present, `availableSessionCount: 10`
-- Staging `POST /api/search`: `success`, `total: 10`
-- Staging `GET /api/sessions/{id}?cityId=nyc`: `success` for `nyc-session-40425724-5`
+- Staging `/api/cities`: `success`, NYC present, `availableSessionCount: 144`
+- Staging `POST /api/search`: `success`, `total: 144`
+- Staging `GET /api/sessions/{id}?cityId=nyc`: `success` for `nyc-session-40425715-144`
 - Staging `POST /api/events`: now part of the required smoke path
 - Operator telemetry query surface: `GET /api/operator/cities/{cityId}/stats` is implemented as a Function-key-protected endpoint
 - Operator stats runbook: `npm run operator:city-stats -- --environment staging --city nyc` resolves the Function key and calls the protected city stats endpoint directly
@@ -46,6 +46,8 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Browser-provided origin override: shipped on `main`; Times Square remains the fallback when permission is denied or unavailable
 - Browser-origin regression coverage: Playwright covers granted-location propagation, denial fallback, reset-to-Times-Square behavior, child-age filter wiring, and telemetry payload shape
 - Router-backed transit assertion: now part of the staging smoke contract and workflow path, with router settings restored from the live staging container before smoke
+- Search now loads 5 latest available pool options by default on first load; the broader result set still comes from an explicit manual search
+- The Times Square travel fallback explanation now lives in an info hover next to `Use browser location`, while the visible origin status line still states the current travel-time origin
 - Parent-facing travel copy now distinguishes live route, schedule-based estimate, and fallback estimate so transit confidence is explicit in both search results and session details
 - Real age eligibility filtering now uses program age bounds instead of a placeholder
 - Search results and session details now surface program age range and age-fit context when provider age bounds are available
@@ -53,7 +55,7 @@ Do not treat older root-level status docs as the active source of truth unless t
 - `SearchRequest.userContext.sessionId` is now optional and aligned with the current browser request shape
 - NYC now has a repo-owned canonical facility reference contract and artifact (`docs/architecture/FACILITY-REFERENCE-CONTRACT.md`, `data/nyc-facilities-canonical.json`) generated from the validated Tableau facility workbook, preserving stable facility ids, address/civic metadata, coordinates, and deterministic crosswalk keys for future messy lesson feeds
 - Repo-side deterministic seed validation now exists at `npm run validate:seed:nyc`, asserting the checked-in NYC session template stays aligned with the canonical facility artifact and current 144-session baseline before any shared-environment reseed
-- Current staging verification blocker on `2026-04-02`: the Azure subscription is read-only (`ReadOnlyDisabledSubscription`) and `func-swim-stg01c` reports `state: AdminDisabled`, so the tracked staging URL currently returns `404` and cannot be reseeded or revalidated until the environment is re-enabled
+- Transit router recovery note on `2026-04-04`: `cg-otp-stg01c` had to be restarted after the first post-reset staging deploy failed its transit-router smoke step; the latest staging deploy and local smoke checks are green after router recovery
 
 ---
 

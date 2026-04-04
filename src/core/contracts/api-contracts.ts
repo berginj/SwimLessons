@@ -102,6 +102,7 @@ export interface SearchFiltersRequest {
   priceMax?: number;
   skillLevel?: ('beginner' | 'intermediate' | 'advanced' | 'all')[];
   facilityType?: ('outdoor' | 'indoor' | 'both')[];
+  onlyAvailable?: boolean;
 }
 
 export interface SortRequest {

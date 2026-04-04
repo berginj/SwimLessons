@@ -123,6 +123,7 @@ export async function search(req: HttpRequest, context: InvocationContext): Prom
       geographyIds: searchRequest.filters.geographyIds,
       maxTravelMinutes: searchRequest.filters.maxTravelMinutes,
       priceMax: searchRequest.filters.priceMax,
+      onlyAvailable: searchRequest.filters.onlyAvailable,
       origin: searchRequest.userContext?.origin ?? cityConfig.defaultCenter,
     };
 
@@ -325,7 +326,7 @@ function validateSearchRequest(req: any): { valid: boolean; errors: string[] } {
 
   // Validate sort if provided
   if (req.sort) {
-    const validFields = ['distance', 'startDate', 'price', 'availability', 'relevance'];
+      const validFields = ['distance', 'startDate', 'price', 'availability', 'createdAt', 'relevance'];
     if (!validFields.includes(req.sort.field)) {
       errors.push(`sort.field must be one of: ${validFields.join(', ')}`);
     }

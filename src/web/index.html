@@ -24,13 +24,24 @@
             <span id="api-status" class="status-pill status-pending">Checking API</span>
           </div>
           <div class="travel-origin-card">
-            <p id="travel-note" class="travel-note">
-              Travel times default to Times Square until you ask the browser for your current location.
-            </p>
             <div class="origin-controls">
-              <button id="use-browser-location" class="secondary-button" type="button">
-                Use browser location
-              </button>
+              <div class="origin-control-with-tooltip">
+                <button id="use-browser-location" class="secondary-button" type="button">
+                  Use browser location
+                </button>
+                <button
+                  id="travel-default-info"
+                  class="info-button"
+                  type="button"
+                  aria-label="Travel time defaults info"
+                >
+                  i
+                </button>
+                <div class="info-tooltip" role="tooltip">
+                  Travel times default to Times Square until you ask the browser for your current
+                  location.
+                </div>
+              </div>
               <button id="reset-origin" class="ghost-button" type="button" hidden>
                 Use Times Square instead
               </button>
