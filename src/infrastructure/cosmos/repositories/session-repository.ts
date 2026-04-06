@@ -97,7 +97,10 @@ export class SessionRepository implements ISessionRepository {
         // This requires a more complex query with ARRAY_CONCAT or multiple conditions
         // Using a simpler approach: check if the session has any of the requested days
         const dayConditions = filters.daysOfWeek
-          .map((day, idx) => `ARRAY_CONTAINS(c.daysOfWeek, ${day})`)
+          .map((day, idx) => {
+            parameters.push({ name: `@day${idx}`, value: day });
+            return `ARRAY_CONTAINS(c.daysOfWeek, @day${idx})`;
+          })
           .join(' OR ');
         query = query.replace('AND ARRAY_CONTAINS(c.daysOfWeek, @dayFilter, true)', `AND (${dayConditions})`);
       }
