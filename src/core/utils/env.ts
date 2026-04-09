@@ -51,8 +51,8 @@ export interface EnvironmentConfig {
   environment: 'development' | 'staging' | 'production';
   cosmosConnectionString: string;
   cosmosDatabaseId: string;
-  appConfigEndpoint: string;
-  keyVaultName: string;
+  appConfigEndpoint?: string;
+  keyVaultName?: string;
   applicationInsightsConnectionString?: string;
   transitRouterGraphqlUrl?: string;
   transitRouterTimeoutMs: number;
@@ -62,18 +62,19 @@ export interface EnvironmentConfig {
  * Load and validate environment configuration
  */
 export function loadEnvironmentConfig(): EnvironmentConfig {
-  const env = getEnvOptional('ENVIRONMENT', 'development');
+  const rawEnv = getEnvOptional('ENVIRONMENT', 'development');
+  const env = rawEnv === 'dev' ? 'development' : rawEnv;
 
   if (env !== 'development' && env !== 'staging' && env !== 'production') {
-    throw new Error(`Invalid ENVIRONMENT: ${env}. Must be development, staging, or production`);
+    throw new Error(`Invalid ENVIRONMENT: ${rawEnv}. Must be development, staging, or production`);
   }
 
   return {
     environment: env,
     cosmosConnectionString: getEnvRequired('COSMOS_CONNECTION_STRING'),
     cosmosDatabaseId: getEnvOptional('COSMOS_DATABASE_ID', 'swimlessons'),
-    appConfigEndpoint: getEnvRequired('APP_CONFIG_ENDPOINT'),
-    keyVaultName: getEnvRequired('KEY_VAULT_NAME'),
+    appConfigEndpoint: getEnvOptional('APP_CONFIG_ENDPOINT', '').trim() || undefined,
+    keyVaultName: getEnvOptional('KEY_VAULT_NAME', '').trim() || undefined,
     applicationInsightsConnectionString: getEnvOptional('APPLICATIONINSIGHTS_CONNECTION_STRING', ''),
     transitRouterGraphqlUrl: getEnvOptional('TRANSIT_ROUTER_GRAPHQL_URL', ''),
     transitRouterTimeoutMs: getEnvNumber('TRANSIT_ROUTER_TIMEOUT_MS', 20000),

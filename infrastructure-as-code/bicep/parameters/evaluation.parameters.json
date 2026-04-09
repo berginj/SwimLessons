@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environment": {
+      "value": "development"
+    },
+    "location": {
+      "value": "eastus"
+    },
+    "resourceSuffix": {
+      "value": "eval01"
+    },
+    "deploymentProfile": {
+      "value": "evaluation"
+    },
+    "tags": {
+      "value": {
+        "environment": "development",
+        "project": "swim-lessons",
+        "managedBy": "bicep",
+        "costCenter": "evaluation"
+      }
+    }
+  }
+}

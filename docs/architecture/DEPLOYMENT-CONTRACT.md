@@ -43,6 +43,10 @@ Secrets must be fetched directly from Azure control-plane commands when needed.
 8. GitHub JavaScript actions must run on Node 24.
 Workflows in this repo must set `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` to avoid the GitHub-hosted Node 20 deprecation path.
 
+9. Cost posture must be selectable by deployment profile, not by ad hoc template edits.
+The repo supports a reusable lean `evaluation` deployment profile for cheaper non-prod environments.
+Profile-specific cost controls must be parameterized and documented, not hand-edited after deployment.
+
 ## Environment Contract
 
 For NYC transit routing behavior, see [TRANSIT-ROUTER-CONTRACT.md](./TRANSIT-ROUTER-CONTRACT.md).
@@ -56,6 +60,7 @@ For NYC transit routing behavior, see [TRANSIT-ROUTER-CONTRACT.md](./TRANSIT-ROU
 - Transit router app settings:
   - `TRANSIT_ROUTER_GRAPHQL_URL` required and restored from the live staging router before smoke
   - `TRANSIT_ROUTER_TIMEOUT_MS` defaults to `20000`
+ - Deployment profile: `standard`
 
 ### Production
 
@@ -66,6 +71,29 @@ For NYC transit routing behavior, see [TRANSIT-ROUTER-CONTRACT.md](./TRANSIT-ROU
 - Transit router app settings:
   - `TRANSIT_ROUTER_GRAPHQL_URL` optional until router service is deployed
   - `TRANSIT_ROUTER_TIMEOUT_MS` defaults to `20000`
+ - Deployment profile: `standard`
+
+### Evaluation
+
+- Workflow: `.github/workflows/cd-evaluation.yml`
+- Resource group: `swim-lessons-evaluation-rg`
+- Parameter file: `infrastructure-as-code/bicep/parameters/evaluation.parameters.json`
+- Intended use: lower-cost evaluation environments that should stay expandable later
+- Deployment profile: `evaluation`
+- Cost controls in this profile:
+  - Azure App Configuration disabled by default
+  - Azure Key Vault disabled by default
+  - Application Insights request sampling reduced to `5%`
+  - Cosmos telemetry-event retention reduced to `14` days
+- Runtime contract in this profile:
+  - `APP_CONFIG_ENDPOINT` may be omitted
+  - `KEY_VAULT_NAME` may be omitted
+  - the endpoint surface remains unchanged
+  - `TRANSIT_ROUTER_GRAPHQL_URL` is intentionally blank so the UI uses deterministic fallback travel-time behavior
+  - deterministic NYC data must still be seeded before smoke tests
+  - smoke still proves `/`, `/api/cities`, `POST /api/search`, `GET /api/sessions/{id}`, and `POST /api/events`
+
+The evaluation profile is not a replacement for the current staging contract. It is a separate, reproducible cost posture for leaner environments.
 
 ## Required Deployment Sequence
 

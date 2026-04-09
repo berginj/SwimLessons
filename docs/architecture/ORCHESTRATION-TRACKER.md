@@ -1,7 +1,7 @@
 # Orchestration Tracker
 
 **Purpose:** Canonical pullable handoff for agents working on the NYC MVP
-**Last Updated:** 2026-04-04
+**Last Updated:** 2026-04-09
 **Status:** Active
 
 ---
@@ -56,6 +56,8 @@ Do not treat older root-level status docs as the active source of truth unless t
 - NYC now has a repo-owned canonical facility reference contract and artifact (`docs/architecture/FACILITY-REFERENCE-CONTRACT.md`, `data/nyc-facilities-canonical.json`) generated from the validated Tableau facility workbook, preserving stable facility ids, address/civic metadata, coordinates, and deterministic crosswalk keys for future messy lesson feeds
 - Repo-side deterministic seed validation now exists at `npm run validate:seed:nyc`, asserting the checked-in NYC session template stays aligned with the canonical facility artifact and current 144-session baseline before any shared-environment reseed
 - Transit router recovery note on `2026-04-04`: `cg-otp-stg01c` had to be restarted after the first post-reset staging deploy failed its transit-router smoke step; the latest staging deploy and local smoke checks are green after router recovery
+- Repo now has a first-class lean evaluation deployment profile at `infrastructure-as-code/bicep/parameters/evaluation.parameters.json`; it keeps the endpoint shape but lowers cost by skipping App Configuration and Key Vault, shortening Cosmos telemetry retention, and reducing Application Insights sampling
+- Repo now also has a manual evaluation deploy workflow at `.github/workflows/cd-evaluation.yml` that seeds deterministic NYC data, clears `TRANSIT_ROUTER_GRAPHQL_URL`, and smoke-tests the UI/API path without requiring the live transit router
 
 ---
 
@@ -100,6 +102,7 @@ Note:
   - `docs/architecture/TRANSIT-ROUTER-CONTRACT.md`
   - GitHub Actions staging workflow
   - Function App app settings for transit router
+  - `docs/architecture/adr/ADR-0001-evaluation-deployment-profile.md`
 
 Current gaps:
 - the current codebase can support a denser deterministic NYC seed, but staging cannot currently be reseeded or revalidated because the Azure subscription is read-only and the staging Function App is admin-disabled as of `2026-04-02`

@@ -1,0 +1,232 @@
+name: Deploy to Evaluation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  ENVIRONMENT: evaluation
+  RESOURCE_GROUP: swim-lessons-evaluation-rg
+  RESOURCE_GROUP_LOCATION: eastus
+  PARAMETERS_FILE: infrastructure-as-code/bicep/parameters/evaluation.parameters.json
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  deploy-infrastructure:
+    name: Deploy Azure Infrastructure
+    runs-on: ubuntu-latest
+    outputs:
+      functionAppName: ${{ steps.deploy.outputs.functionAppName }}
+      cosmosDbAccountName: ${{ steps.deploy.outputs.cosmosDbAccountName }}
+      staticWebAppName: ${{ steps.deploy.outputs.staticWebAppName }}
+      staticWebAppUrl: ${{ steps.deploy.outputs.staticWebAppUrl }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Azure Login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Ensure Resource Group Exists
+        run: |
+          CURRENT_RG_LOCATION=$(az group show \
+            --name ${{ env.RESOURCE_GROUP }} \
+            --query location \
+            --output tsv 2>/dev/null || true)
+
+          if [ -z "$CURRENT_RG_LOCATION" ]; then
+            az group create \
+              --name ${{ env.RESOURCE_GROUP }} \
+              --location ${{ env.RESOURCE_GROUP_LOCATION }}
+            echo "Created resource group in ${{ env.RESOURCE_GROUP_LOCATION }}"
+          else
+            echo "Using existing resource group in $CURRENT_RG_LOCATION"
+          fi
+
+      - name: Deploy Bicep Template
+        id: deploy
+        run: |
+          DEPLOYMENT_NAME="deploy-evaluation-$(date +%Y%m%d-%H%M%S)"
+
+          az deployment group create \
+            --name "$DEPLOYMENT_NAME" \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --template-file infrastructure-as-code/bicep/main.bicep \
+            --parameters ${{ env.PARAMETERS_FILE }} \
+            --output json > deployment-output.json
+
+          FUNCTION_APP_NAME=$(jq -r '.properties.outputs.functionAppName.value' deployment-output.json)
+          COSMOS_DB_ACCOUNT_NAME=$(jq -r '.properties.outputs.cosmosDbAccountName.value' deployment-output.json)
+          STATIC_WEB_APP_NAME=$(jq -r '.properties.outputs.staticWebAppName.value' deployment-output.json)
+          STATIC_WEB_APP_URL=$(jq -r '.properties.outputs.staticWebAppUrl.value' deployment-output.json)
+
+          echo "functionAppName=$FUNCTION_APP_NAME" >> $GITHUB_OUTPUT
+          echo "cosmosDbAccountName=$COSMOS_DB_ACCOUNT_NAME" >> $GITHUB_OUTPUT
+          echo "staticWebAppName=$STATIC_WEB_APP_NAME" >> $GITHUB_OUTPUT
+          echo "staticWebAppUrl=$STATIC_WEB_APP_URL" >> $GITHUB_OUTPUT
+
+          echo "✅ Evaluation infrastructure deployed successfully"
+
+      - name: Link Function App Backend
+        run: |
+          FUNCTION_APP_NAME="${{ steps.deploy.outputs.functionAppName }}"
+          STATIC_WEB_APP_NAME="${{ steps.deploy.outputs.staticWebAppName }}"
+          FUNCTION_APP_ID="/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.RESOURCE_GROUP }}/providers/Microsoft.Web/sites/${FUNCTION_APP_NAME}"
+          FUNCTION_APP_LOCATION=$(az functionapp show \
+            --name "$FUNCTION_APP_NAME" \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query location \
+            --output tsv)
+          EXISTING_BACKEND_ID=$(az staticwebapp backends show \
+            --name "$STATIC_WEB_APP_NAME" \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query "[0].backendResourceId" \
+            --output tsv 2>/dev/null || true)
+
+          if [ -n "$EXISTING_BACKEND_ID" ] && [ "$EXISTING_BACKEND_ID" != "$FUNCTION_APP_ID" ]; then
+            az staticwebapp backends unlink \
+              --name "$STATIC_WEB_APP_NAME" \
+              --resource-group ${{ env.RESOURCE_GROUP }}
+          fi
+
+          if [ "$EXISTING_BACKEND_ID" != "$FUNCTION_APP_ID" ]; then
+            az staticwebapp backends link \
+              --name "$STATIC_WEB_APP_NAME" \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --backend-resource-id "$FUNCTION_APP_ID" \
+              --backend-region "$FUNCTION_APP_LOCATION"
+          fi
+
+      - name: Normalize Function App Auth
+        run: |
+          FUNCTION_APP_NAME="${{ steps.deploy.outputs.functionAppName }}"
+          az resource update \
+            --ids "/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ env.RESOURCE_GROUP }}/providers/Microsoft.Web/sites/${FUNCTION_APP_NAME}/config/authsettingsV2" \
+            --set properties.globalValidation.requireAuthentication=false \
+                  properties.globalValidation.unauthenticatedClientAction=AllowAnonymous \
+            --output none
+
+      - name: Clear transit router settings
+        run: |
+          az functionapp config appsettings set \
+            --name "${{ steps.deploy.outputs.functionAppName }}" \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --settings \
+              "TRANSIT_ROUTER_GRAPHQL_URL=" \
+              "TRANSIT_ROUTER_TIMEOUT_MS=20000" \
+            --output none
+
+  deploy-functions:
+    name: Deploy Function App
+    runs-on: ubuntu-latest
+    needs: deploy-infrastructure
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Function deployment package
+        run: |
+          npm run build:functions:deploy
+          npm install --prefix function-deploy --omit=dev
+
+      - name: Azure Login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Azure Functions
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ needs.deploy-infrastructure.outputs.functionAppName }}
+          package: './function-deploy'
+
+  deploy-web-app:
+    name: Deploy Static Web App
+    runs-on: ubuntu-latest
+    needs: deploy-infrastructure
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_SWA_POOLS }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: 'upload'
+          app_location: 'src/web'
+          api_location: ''
+          output_location: ''
+          skip_app_build: true
+
+  seed-evaluation-data:
+    name: Seed NYC Evaluation Data
+    runs-on: ubuntu-latest
+    needs: [deploy-infrastructure, deploy-functions]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Azure Login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Seed deterministic NYC session data
+        env:
+          AZURE_RESOURCE_GROUP: ${{ env.RESOURCE_GROUP }}
+          COSMOS_ACCOUNT_NAME: ${{ needs.deploy-infrastructure.outputs.cosmosDbAccountName }}
+          COSMOS_DATABASE_ID: swimlessons
+          SESSIONS_CSV_PATH: data/sessions-template.csv
+        run: npm run seed:staging:nyc
+
+  run-smoke-tests:
+    name: Run Evaluation Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [deploy-infrastructure, deploy-functions, deploy-web-app, seed-evaluation-data]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Run smoke tests
+        run: |
+          npm run smoke:staging -- "${{ needs.deploy-infrastructure.outputs.staticWebAppUrl }}"

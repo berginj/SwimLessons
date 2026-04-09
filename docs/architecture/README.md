@@ -23,7 +23,8 @@
 2. **[example-implementations.md](./example-implementations.md)** - Reference code for each layer
 
 ### 📝 Design Decisions
-- **[adr/](./adr/)** - Architecture Decision Records (coming soon)
+- **[adr/](./adr/)** - Architecture Decision Records
+- **[adr/ADR-0001-evaluation-deployment-profile.md](./adr/ADR-0001-evaluation-deployment-profile.md)** - Lean evaluation deployment profile for lower-cost environments
 
 ---
 

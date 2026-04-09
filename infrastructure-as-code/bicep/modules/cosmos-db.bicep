@@ -14,6 +14,10 @@ param tags object
 @description('Enable serverless mode (pay-per-request, no minimum RU/s)')
 param enableServerless bool = true
 
+@description('Telemetry event retention in days')
+@minValue(1)
+param eventRetentionDays int = 90
+
 resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2023-04-15' = {
   name: accountName
   location: location
@@ -109,14 +113,20 @@ resource eventsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/con
         paths: ['/cityId']
         kind: 'Hash'
       }
-      defaultTtl: 7776000  // 90 days (auto-delete old events)
+      defaultTtl: eventRetentionDays * 24 * 60 * 60
       indexingPolicy: {
         indexingMode: 'consistent'
         automatic: true
         includedPaths: [
-          { path: '/*' }
+          { path: '/cityId/?' }
+          { path: '/type/?' }
+          { path: '/eventName/?' }
+          { path: '/timestamp/?' }
+          { path: '/sessionId/?' }
+          { path: '/userId/?' }
         ]
         excludedPaths: [
+          { path: '/*' }
           { path: '/"_etag"/?' }
         ]
       }

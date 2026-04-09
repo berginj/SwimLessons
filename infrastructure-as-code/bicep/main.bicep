@@ -27,6 +27,28 @@ param transitRouterGraphqlUrl string = ''
 @description('Transit router request timeout in milliseconds')
 param transitRouterTimeoutMs int = 20000
 
+@description('Deployment cost profile')
+@allowed([
+  'standard'
+  'evaluation'
+])
+param deploymentProfile string = 'standard'
+
+@description('Deploy Azure App Configuration for runtime config and feature flags')
+param deployAppConfiguration bool = deploymentProfile != 'evaluation'
+
+@description('Deploy Azure Key Vault for runtime secret indirection')
+param deployKeyVault bool = deploymentProfile != 'evaluation'
+
+@description('Application Insights request sampling percentage')
+@minValue(1)
+@maxValue(100)
+param applicationInsightsSamplingPercentage int = deploymentProfile == 'evaluation' ? 5 : 20
+
+@description('Telemetry event retention in days')
+@minValue(1)
+param telemetryEventRetentionDays int = deploymentProfile == 'evaluation' ? 14 : 90
+
 // === Cosmos DB (Serverless Mode) ===
 module cosmosDb 'modules/cosmos-db.bicep' = {
   name: '${deployment().name}-cosmosDb'
@@ -35,11 +57,12 @@ module cosmosDb 'modules/cosmos-db.bicep' = {
     location: location
     tags: tags
     enableServerless: true
+    eventRetentionDays: telemetryEventRetentionDays
   }
 }
 
 // === Azure App Configuration (Free Tier) ===
-module appConfiguration 'modules/app-configuration.bicep' = {
+module appConfiguration 'modules/app-configuration.bicep' = if (deployAppConfiguration) {
   name: '${deployment().name}-appConfig'
   params: {
     configStoreName: 'appconfig-swim-${resourceSuffix}'
@@ -50,7 +73,7 @@ module appConfiguration 'modules/app-configuration.bicep' = {
 }
 
 // === Azure Key Vault (Standard Tier) ===
-module keyVault 'modules/key-vault.bicep' = {
+module keyVault 'modules/key-vault.bicep' = if (deployKeyVault) {
   name: '${deployment().name}-keyVault'
   params: {
     vaultName: 'kv-swim-${resourceSuffix}'
@@ -69,8 +92,9 @@ module functionApps 'modules/function-apps.bicep' = {
     tags: tags
     cosmosAccountName: cosmosDb.outputs.accountName
     cosmosDatabaseId: 'swimlessons'
-    appConfigEndpoint: appConfiguration.outputs.endpoint
-    keyVaultName: keyVault.outputs.vaultName
+    appConfigEndpoint: deployAppConfiguration ? appConfiguration.outputs.endpoint : ''
+    keyVaultName: deployKeyVault ? keyVault.outputs.vaultName : ''
+    applicationInsightsConnectionString: appInsights.outputs.connectionString
     transitRouterGraphqlUrl: transitRouterGraphqlUrl
     transitRouterTimeoutMs: transitRouterTimeoutMs
   }
@@ -83,7 +107,7 @@ module appInsights 'modules/application-insights.bicep' = {
     appInsightsName: 'appi-swim-${resourceSuffix}'
     location: location
     tags: tags
-    samplingPercentage: 20  // Cost optimization: sample 20% of requests
+    samplingPercentage: applicationInsightsSamplingPercentage
   }
 }
 
@@ -101,11 +125,12 @@ module staticWebApp 'modules/static-web-app.bicep' = {
 // === Outputs ===
 output cosmosDbAccountName string = cosmosDb.outputs.accountName
 output cosmosDbEndpoint string = cosmosDb.outputs.endpoint
-output appConfigEndpoint string = appConfiguration.outputs.endpoint
-output keyVaultName string = keyVault.outputs.vaultName
+output appConfigEndpoint string = deployAppConfiguration ? appConfiguration.outputs.endpoint : ''
+output keyVaultName string = deployKeyVault ? keyVault.outputs.vaultName : ''
 output functionAppName string = functionApps.outputs.functionAppName
 output functionAppUrl string = functionApps.outputs.functionAppUrl
 output appInsightsInstrumentationKey string = appInsights.outputs.instrumentationKey
 output staticWebAppName string = staticWebApp.outputs.staticWebAppName
 output staticWebAppUrl string = staticWebApp.outputs.url
 output staticWebAppDefaultHostname string = staticWebApp.outputs.defaultHostname
+output deploymentProfileName string = deploymentProfile

@@ -321,11 +321,15 @@ All endpoints track execution time and include it in the response metadata:
 
 - `COSMOS_CONNECTION_STRING`: Cosmos DB connection string
 - `COSMOS_DATABASE_ID`: Cosmos DB database ID (default: swimlessons)
-- `APP_CONFIG_ENDPOINT`: Azure App Configuration endpoint
-- `KEY_VAULT_NAME`: Azure Key Vault name
+- `APP_CONFIG_ENDPOINT`: (optional) Azure App Configuration endpoint
+- `KEY_VAULT_NAME`: (optional) Azure Key Vault name
 - `APPLICATIONINSIGHTS_CONNECTION_STRING`: (optional) Application Insights connection
 - `TRANSIT_ROUTER_GRAPHQL_URL`: (optional) OpenTripPlanner GraphQL endpoint for NYC schedule-based routing
 - `TRANSIT_ROUTER_TIMEOUT_MS`: (optional) timeout for transit router requests in milliseconds
+
+Notes:
+- Lean evaluation deployments may omit `APP_CONFIG_ENDPOINT` and `KEY_VAULT_NAME`.
+- The current runtime does not require those services to boot unless future feature-flag or secret-resolution wiring is enabled.
 
 Transit routing ownership, provider precedence, fallback rules, and staging expectations are defined in [TRANSIT-ROUTER-CONTRACT.md](../../docs/architecture/TRANSIT-ROUTER-CONTRACT.md).
 

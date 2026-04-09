@@ -69,7 +69,7 @@ export class SessionRepository implements ISessionRepository {
   ): Promise<Session[]> {
     try {
       let query = 'SELECT * FROM c WHERE c.type = @type AND c.cityId = @cityId';
-      const parameters = [
+      const parameters: Array<{ name: string; value: string | number | boolean }> = [
         { name: '@type', value: 'SessionDocument' },
         { name: '@cityId', value: cityId },
       ];
@@ -334,7 +334,7 @@ export class SessionRepository implements ISessionRepository {
   async listProviders(cityId: string): Promise<Provider[]> {
     try {
       const query = 'SELECT * FROM c WHERE c.type = @type AND c.cityId = @cityId ORDER BY c.name ASC';
-      const parameters = [
+      const parameters: Array<{ name: string; value: string | number | boolean }> = [
         { name: '@type', value: 'ProviderDocument' },
         { name: '@cityId', value: cityId },
       ];
@@ -485,7 +485,7 @@ export class SessionRepository implements ISessionRepository {
   async listLocations(cityId: string, providerId?: string): Promise<Location[]> {
     try {
       let query = 'SELECT * FROM c WHERE c.type = @type AND c.cityId = @cityId';
-      const parameters = [
+      const parameters: Array<{ name: string; value: string | number | boolean }> = [
         { name: '@type', value: 'LocationDocument' },
         { name: '@cityId', value: cityId },
       ];
@@ -644,7 +644,7 @@ export class SessionRepository implements ISessionRepository {
   async listPrograms(cityId: string, locationId?: string): Promise<Program[]> {
     try {
       let query = 'SELECT * FROM c WHERE c.type = @type AND c.cityId = @cityId';
-      const parameters = [
+      const parameters: Array<{ name: string; value: string | number | boolean }> = [
         { name: '@type', value: 'ProgramDocument' },
         { name: '@cityId', value: cityId },
       ];

@@ -104,4 +104,28 @@ Read:
 - `docs/architecture/ORCHESTRATION-TRACKER.md`
 - `EXECUTION_LOG.md`
 
+## Lean Evaluation Profile
+
+For lower-cost evaluation environments, use:
+
+- `infrastructure-as-code/bicep/parameters/evaluation.parameters.json`
+- `.github/workflows/cd-evaluation.yml`
+
+That profile is designed to stay expandable later:
+
+- keeps the current endpoint surface intact
+- deploys a single Application Insights resource
+- skips Azure App Configuration by default
+- skips Azure Key Vault by default
+- lowers telemetry sampling and retention instead of removing telemetry entirely
+
+The current staging and production contracts still use the standard profile.
+
+The evaluation workflow is intended for “click through the UI and return real seeded results” testing:
+
+- deploys the lean profile
+- seeds deterministic NYC data
+- clears `TRANSIT_ROUTER_GRAPHQL_URL`
+- smoke-tests the shared UI/API flow without requiring the live transit router
+
 Do not assume a repo push will go live immediately. Use the execution log for the current repo-hardening status and the first post-reset deploy/reseed sequence.

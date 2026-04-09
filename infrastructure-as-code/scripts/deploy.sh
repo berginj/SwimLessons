@@ -4,6 +4,7 @@ set -e
 # Deploy Azure Infrastructure with Bicep
 # Usage: ./deploy.sh <environment> [resourceGroupName] [resourceGroupLocation]
 # Example: ./deploy.sh staging swim-lessons-staging-rg eastus
+# Example: ./deploy.sh evaluation swim-lessons-evaluation-rg eastus
 
 ENVIRONMENT=${1:-dev}
 RESOURCE_GROUP=${2:-"swim-lessons-${ENVIRONMENT}-rg"}
@@ -12,6 +13,10 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 BICEP_ROOT=$(cd "${SCRIPT_DIR}/../bicep" && pwd)
 PARAMETERS_FILE="${BICEP_ROOT}/parameters/${ENVIRONMENT}.parameters.json"
 MAIN_TEMPLATE="${BICEP_ROOT}/main.bicep"
+
+if [ "${ENVIRONMENT}" = "evaluation" ]; then
+    PARAMETERS_FILE="${BICEP_ROOT}/parameters/evaluation.parameters.json"
+fi
 
 echo "🚀 Deploying Swim Lessons Platform to Azure"
 echo "   Environment: ${ENVIRONMENT}"

@@ -16,10 +16,13 @@ param tags object
 param cosmosAccountName string
 
 @description('App Configuration endpoint')
-param appConfigEndpoint string
+param appConfigEndpoint string = ''
 
 @description('Key Vault name')
-param keyVaultName string
+param keyVaultName string = ''
+
+@description('Application Insights connection string')
+param applicationInsightsConnectionString string = ''
 
 @description('Cosmos DB database ID')
 param cosmosDatabaseId string = 'swimlessons'
@@ -42,18 +45,6 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   properties: {
     minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: true
-  }
-}
-
-// Application Insights for monitoring
-resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
-  name: 'appi-${functionAppName}'
-  location: location
-  tags: tags
-  kind: 'web'
-  properties: {
-    Application_Type: 'web'
-    SamplingPercentage: 20  // Cost optimization
   }
 }
 
@@ -85,7 +76,7 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
     httpsOnly: true
     siteConfig: {
       linuxFxVersion: 'NODE|22'
-      appSettings: [
+      appSettings: concat([
         {
           name: 'AzureWebJobsStorage'
           value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
@@ -99,24 +90,12 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
           value: 'node'
         }
         {
-          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-          value: appInsights.properties.ConnectionString
-        }
-        {
           name: 'COSMOS_CONNECTION_STRING'
           value: listConnectionStrings(resourceId('Microsoft.DocumentDB/databaseAccounts', cosmosAccountName), '2023-04-15').connectionStrings[0].connectionString
         }
         {
           name: 'COSMOS_DATABASE_ID'
           value: cosmosDatabaseId
-        }
-        {
-          name: 'APP_CONFIG_ENDPOINT'
-          value: appConfigEndpoint
-        }
-        {
-          name: 'KEY_VAULT_NAME'
-          value: keyVaultName
         }
         {
           name: 'ENVIRONMENT'
@@ -130,7 +109,22 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
           name: 'TRANSIT_ROUTER_TIMEOUT_MS'
           value: string(transitRouterTimeoutMs)
         }
-      ]
+      ], empty(applicationInsightsConnectionString) ? [] : [
+        {
+          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+          value: applicationInsightsConnectionString
+        }
+      ], empty(appConfigEndpoint) ? [] : [
+        {
+          name: 'APP_CONFIG_ENDPOINT'
+          value: appConfigEndpoint
+        }
+      ], empty(keyVaultName) ? [] : [
+        {
+          name: 'KEY_VAULT_NAME'
+          value: keyVaultName
+        }
+      ])
     }
   }
 }

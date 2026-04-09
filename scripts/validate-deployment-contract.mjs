@@ -15,6 +15,7 @@ const environments = [
     resourceGroupLocation: 'eastus',
     parameterFilePath: 'infrastructure-as-code/bicep/parameters/staging.parameters.json',
     expectedDeploymentLocation: 'centralus',
+    expectedEnvironmentValue: 'staging',
   },
   {
     name: 'production',
@@ -22,6 +23,15 @@ const environments = [
     resourceGroupLocation: 'eastus',
     parameterFilePath: 'infrastructure-as-code/bicep/parameters/production.parameters.json',
     expectedDeploymentLocation: 'eastus',
+    expectedEnvironmentValue: 'production',
+  },
+  {
+    name: 'evaluation',
+    workflowPath: '.github/workflows/cd-evaluation.yml',
+    resourceGroupLocation: 'eastus',
+    parameterFilePath: 'infrastructure-as-code/bicep/parameters/evaluation.parameters.json',
+    expectedDeploymentLocation: 'eastus',
+    expectedEnvironmentValue: 'development',
   },
 ];
 
@@ -226,11 +236,47 @@ async function validateWorkflow(env) {
       'npm run smoke:staging --',
       `${env.workflowPath} must run the staged end-to-end smoke script`
     );
-  } else {
+  } else if (env.name === 'production') {
     assertContains(
       workflow,
       '/api/cities',
       `${env.workflowPath} must smoke test /api/cities`
+    );
+  } else if (env.name === 'evaluation') {
+    assertContains(
+      workflow,
+      'cosmosDbAccountName',
+      `${env.workflowPath} must capture cosmosDbAccountName from the Bicep deployment outputs`
+    );
+
+    assertContains(
+      workflow,
+      'Seed NYC Evaluation Data',
+      `${env.workflowPath} must seed deterministic NYC evaluation data before smoke tests`
+    );
+
+    assertContains(
+      workflow,
+      'npm run seed:staging:nyc',
+      `${env.workflowPath} must run npm run seed:staging:nyc`
+    );
+
+    assertContains(
+      workflow,
+      'Clear transit router settings',
+      `${env.workflowPath} must explicitly clear transit router settings for lean evaluation deploys`
+    );
+
+    assertContains(
+      workflow,
+      'TRANSIT_ROUTER_GRAPHQL_URL=',
+      `${env.workflowPath} must blank TRANSIT_ROUTER_GRAPHQL_URL so evaluation uses fallback transit`
+    );
+
+    assertContains(
+      workflow,
+      'npm run smoke:staging --',
+      `${env.workflowPath} must run the shared smoke script against the evaluation site`
     );
   }
 }
@@ -240,9 +286,9 @@ async function validateParameterFile(env) {
   const environmentValue = parameterFile?.parameters?.environment?.value;
   const locationValue = parameterFile?.parameters?.location?.value;
 
-  if (environmentValue !== env.name) {
+  if (environmentValue !== env.expectedEnvironmentValue) {
     errors.push(
-      `${env.parameterFilePath} must set parameters.environment.value to "${env.name}", found "${environmentValue}"`
+      `${env.parameterFilePath} must set parameters.environment.value to "${env.expectedEnvironmentValue}", found "${environmentValue}"`
     );
   }
 
