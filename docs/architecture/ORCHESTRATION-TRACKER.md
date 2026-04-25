@@ -1,7 +1,7 @@
 # Orchestration Tracker
 
 **Purpose:** Canonical pullable handoff for agents working on the NYC MVP
-**Last Updated:** 2026-04-09
+**Last Updated:** 2026-04-24
 **Status:** Active
 
 ---
@@ -58,6 +58,7 @@ Do not treat older root-level status docs as the active source of truth unless t
 - Transit router recovery note on `2026-04-04`: `cg-otp-stg01c` had to be restarted after the first post-reset staging deploy failed its transit-router smoke step; the latest staging deploy and local smoke checks are green after router recovery
 - Repo now has a first-class lean evaluation deployment profile at `infrastructure-as-code/bicep/parameters/evaluation.parameters.json`; it keeps the endpoint shape but lowers cost by skipping App Configuration and Key Vault, shortening Cosmos telemetry retention, and reducing Application Insights sampling
 - Repo now also has a manual evaluation deploy workflow at `.github/workflows/cd-evaluation.yml` that seeds deterministic NYC data, clears `TRANSIT_ROUTER_GRAPHQL_URL`, and smoke-tests the UI/API path without requiring the live transit router
+- Repo now has a repo-owned parking-mode workflow at `.github/workflows/parking-mode.yml`; it writes a parked runtime config for the Static Web App and stops or starts the linked Function App so operators can pause the live app without serving a broken shell
 
 ---
 
@@ -101,12 +102,14 @@ Note:
   - `docs/architecture/DEPLOYMENT-CONTRACT.md`
   - `docs/architecture/TRANSIT-ROUTER-CONTRACT.md`
   - GitHub Actions staging workflow
+  - GitHub Actions parking-mode workflow
   - Function App app settings for transit router
   - `docs/architecture/adr/ADR-0001-evaluation-deployment-profile.md`
 
 Current gaps:
 - the current codebase can support a denser deterministic NYC seed, but staging cannot currently be reseeded or revalidated because the Azure subscription is read-only and the staging Function App is admin-disabled as of `2026-04-02`
 - the remaining architecture summary docs still need periodic spot-checks so they do not drift back toward planning-era assumptions
+- parking mode reduces Function execution during pauses but does not remove baseline cost from the Static Web App or other provisioned Azure resources
 
 ---
 

@@ -1,0 +1,13 @@
+{
+  "parkingMode": {
+    "enabled": false,
+    "eyebrow": "NYC MVP",
+    "title": "Find kids' swim lessons without digging through five provider sites.",
+    "heroCopy": "This MVP uses the deployed Azure Functions API when available and falls back to local demo data when it is not.",
+    "statusLabel": "Parking mode",
+    "message": "Search and live transit lookups are paused right now. This page is staying online so families can still see that the service exists and check back later.",
+    "details": "Live search, session details, and telemetry collection will resume when the backend is turned back on.",
+    "resumeHint": "Check back soon for the full NYC lesson search experience."
+  },
+  "generatedAt": "2026-04-25T02:23:33.732Z"
+}

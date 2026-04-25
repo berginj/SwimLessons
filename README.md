@@ -128,4 +128,20 @@ The evaluation workflow is intended for “click through the UI and return real 
 - clears `TRANSIT_ROUTER_GRAPHQL_URL`
 - smoke-tests the shared UI/API flow without requiring the live transit router
 
+## Parking Mode
+
+For a cheaper pause state that keeps a static page online, use:
+
+- `.github/workflows/parking-mode.yml`
+
+Parking mode is a deliberate operator workflow, not an accidental API outage:
+
+- deploys a parked static view from `src/web/runtime-config.json`
+- stops the Azure Function App in the target environment
+- leaves the Static Web App online so the site still renders
+- resumes by rewriting `runtime-config.json` back to live mode, redeploying the web app, and starting the Function App again
+
+Parking mode is intended for temporary pauses where you want a branded static page instead of live search.
+It does not remove the baseline cost of the Static Web App or other provisioned Azure resources.
+
 Do not assume a repo push will go live immediately. Use the execution log for the current repo-hardening status and the first post-reset deploy/reseed sequence.

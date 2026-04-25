@@ -9,15 +9,33 @@
   <body>
     <div class="page-shell">
       <header class="hero">
-        <p class="eyebrow">NYC MVP</p>
-        <h1>Find kids' swim lessons without digging through five provider sites.</h1>
-        <p class="hero-copy">
+        <p id="hero-eyebrow" class="eyebrow">NYC MVP</p>
+        <h1 id="hero-title">Find kids' swim lessons without digging through five provider sites.</h1>
+        <p id="hero-copy" class="hero-copy">
           This MVP uses the deployed Azure Functions API when available and falls back to local
           demo data when it is not.
         </p>
       </header>
 
-      <main class="layout">
+      <section id="parking-panel" class="panel parking-panel" hidden>
+        <div class="panel-header">
+          <h2>Temporary parking mode</h2>
+          <span id="parking-status" class="status-pill status-demo">Parking mode</span>
+        </div>
+        <p id="parking-message" class="parking-copy">
+          Search and live transit lookups are paused right now. This page is staying online so
+          families can still see that the service exists and check back later.
+        </p>
+        <p id="parking-details" class="parking-details">
+          Live search, session details, and telemetry collection will resume when the backend is
+          turned back on.
+        </p>
+        <p id="parking-resume-hint" class="parking-resume-hint">
+          Check back soon for the full NYC lesson search experience.
+        </p>
+      </section>
+
+      <main id="app-layout" class="layout">
         <section class="panel search-panel">
           <div class="panel-header">
             <h2>Search</h2>

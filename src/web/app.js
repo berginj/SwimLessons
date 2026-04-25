@@ -5,6 +5,18 @@ const DEFAULT_TRANSIT_ORIGIN_LABEL = 'Times Square';
 const DEFAULT_TRANSIT_ORIGIN = { latitude: 40.758, longitude: -73.9855 };
 const BROWSER_TRANSIT_ORIGIN_LABEL = 'your current location';
 const LANDING_RESULTS_LIMIT = 5;
+const DEFAULT_RUNTIME_CONFIG = {
+  parkingMode: {
+    enabled: false,
+    eyebrow: 'NYC MVP',
+    title: "Find kids' swim lessons without digging through five provider sites.",
+    heroCopy: 'This MVP uses the deployed Azure Functions API when available and falls back to local demo data when it is not.',
+    statusLabel: 'Parking mode',
+    message: 'Search and live transit lookups are paused right now. This page is staying online so families can still see that the service exists and check back later.',
+    details: 'Live search, session details, and telemetry collection will resume when the backend is turned back on.',
+    resumeHint: 'Check back soon for the full NYC lesson search experience.',
+  },
+};
 
 const DAY_OPTIONS = [
   { value: 0, label: 'Sun' },
@@ -182,6 +194,15 @@ const state = {
 };
 
 const elements = {
+  heroEyebrow: document.getElementById('hero-eyebrow'),
+  heroTitle: document.getElementById('hero-title'),
+  heroCopy: document.getElementById('hero-copy'),
+  parkingPanel: document.getElementById('parking-panel'),
+  parkingStatus: document.getElementById('parking-status'),
+  parkingMessage: document.getElementById('parking-message'),
+  parkingDetails: document.getElementById('parking-details'),
+  parkingResumeHint: document.getElementById('parking-resume-hint'),
+  layout: document.getElementById('app-layout'),
   apiStatus: document.getElementById('api-status'),
   originStatus: document.getElementById('origin-status'),
   useBrowserLocation: document.getElementById('use-browser-location'),
@@ -208,6 +229,12 @@ init().catch((error) => {
 });
 
 async function init() {
+  const runtimeConfig = await loadRuntimeConfig();
+  if (runtimeConfig.parkingMode.enabled) {
+    activateParkingMode(runtimeConfig.parkingMode);
+    return;
+  }
+
   renderDayChips();
   setupOriginControls();
   elements.form.addEventListener('submit', handleSearch);
@@ -217,6 +244,43 @@ async function init() {
   telemetry.trackPageLoaded(state.mode);
 
   await runSearch({ trigger: 'initial' });
+}
+
+async function loadRuntimeConfig() {
+  try {
+    const response = await fetch('./runtime-config.json', { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error(`Runtime config request failed with ${response.status}`);
+    }
+
+    const payload = await response.json();
+    return {
+      parkingMode: {
+        ...DEFAULT_RUNTIME_CONFIG.parkingMode,
+        ...(payload?.parkingMode || {}),
+      },
+    };
+  } catch (error) {
+    console.warn('Falling back to default runtime config:', error);
+    return DEFAULT_RUNTIME_CONFIG;
+  }
+}
+
+function activateParkingMode(parkingMode) {
+  document.body.classList.add('parking-mode');
+  elements.heroEyebrow.textContent = parkingMode.eyebrow;
+  elements.heroTitle.textContent = parkingMode.title;
+  elements.heroCopy.textContent = parkingMode.heroCopy;
+  elements.parkingStatus.textContent = parkingMode.statusLabel;
+  elements.parkingMessage.textContent = parkingMode.message;
+  elements.parkingDetails.textContent = parkingMode.details;
+  elements.parkingResumeHint.textContent = parkingMode.resumeHint;
+  elements.layout.hidden = true;
+  elements.parkingPanel.hidden = false;
+
+  if (elements.dialog.open) {
+    elements.dialog.close();
+  }
 }
 
 function setupOriginControls() {

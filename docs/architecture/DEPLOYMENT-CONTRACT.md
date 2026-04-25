@@ -1,6 +1,6 @@
 # Deployment Contract
 
-**Last Updated:** 2026-03-26
+**Last Updated:** 2026-04-24
 **Status:** Enforced in CI
 
 ## Purpose
@@ -46,6 +46,10 @@ Workflows in this repo must set `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` to avo
 9. Cost posture must be selectable by deployment profile, not by ad hoc template edits.
 The repo supports a reusable lean `evaluation` deployment profile for cheaper non-prod environments.
 Profile-specific cost controls must be parameterized and documented, not hand-edited after deployment.
+
+10. Temporary pause behavior must be workflow-driven.
+If the app is intentionally parked, the web app must render an explicit static parked state instead of relying on opaque API failures.
+Starting and stopping the Function App for parking mode must happen from a repo-owned workflow.
 
 ## Environment Contract
 
@@ -95,6 +99,21 @@ For NYC transit routing behavior, see [TRANSIT-ROUTER-CONTRACT.md](./TRANSIT-ROU
 
 The evaluation profile is not a replacement for the current staging contract. It is a separate, reproducible cost posture for leaner environments.
 
+## Parking Mode Contract
+
+- Workflow: `.github/workflows/parking-mode.yml`
+- Supported environments: `evaluation`, `staging`, `production`
+- Parking mode must:
+  - deploy a static parked homepage via `src/web/runtime-config.json`
+  - stop the target environment Function App after writing the parked runtime config
+  - leave the Static Web App online
+- Resume mode must:
+  - rewrite `src/web/runtime-config.json` back to live mode
+  - redeploy the Static Web App content
+  - start the target environment Function App
+- Parking mode is allowed to suspend live search, session details, and telemetry ingestion temporarily, but it must not masquerade as a healthy live deployment
+- Parking mode is not a substitute for evaluation profile cost controls; it is an operational pause path
+
 ## Required Deployment Sequence
 
 1. Ensure the resource group exists.
@@ -142,6 +161,8 @@ That script must:
 - link the SWA backend after Bicep finishes
 - normalize Function App auth after linking
 - remind the operator that Functions package deployment is still required
+
+For manual pause/resume operations, use `.github/workflows/parking-mode.yml` instead of ad hoc portal changes.
 
 ## Enforcement
 

@@ -26,3 +26,10 @@
 
 - improves first-load trust for the NYC parent/caregiver by showing a smaller set of fresh, available options instead of an unbounded generic result list
 - keeps the travel-time default explicit without crowding the search panel
+
+## Parking Mode Workflow
+
+- the web app now supports a repo-owned runtime parking switch from `src/web/runtime-config.json`
+- when parking mode is enabled, the homepage must render a static parked view instead of attempting search, session detail, geolocation, or telemetry calls
+- parking mode is an operator action for temporary pauses, not a replacement for the standard staging or evaluation workflows
+- resume mode must restore the normal search UI and restart the linked Function App

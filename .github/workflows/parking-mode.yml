@@ -1,0 +1,231 @@
+name: Toggle Parking Mode
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: Environment to toggle
+        required: true
+        type: choice
+        options:
+          - evaluation
+          - staging
+          - production
+      mode:
+        description: Park keeps only the static view; resume restores the live app
+        required: true
+        type: choice
+        options:
+          - park
+          - resume
+      title:
+        description: Optional headline override for the parked page
+        required: false
+        type: string
+      message:
+        description: Optional primary parked-page copy
+        required: false
+        type: string
+      details:
+        description: Optional secondary parked-page copy
+        required: false
+        type: string
+      resume_hint:
+        description: Optional hint shown at the bottom of the parked page
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  toggle-nonprod:
+    name: Toggle Parking Mode (Non-Prod)
+    if: ${{ inputs.target_environment != 'production' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Select environment settings
+        run: |
+          case "${{ inputs.target_environment }}" in
+            evaluation)
+              echo "RESOURCE_GROUP=swim-lessons-evaluation-rg" >> "$GITHUB_ENV"
+              ;;
+            staging)
+              echo "RESOURCE_GROUP=swim-lessons-staging-rg" >> "$GITHUB_ENV"
+              ;;
+            *)
+              echo "Unsupported non-prod environment" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Azure Login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve deployed resource names
+        run: |
+          FUNCTION_APP_NAME=$(az functionapp list \
+            --resource-group "$RESOURCE_GROUP" \
+            --query "[0].name" \
+            --output tsv)
+          STATIC_WEB_APP_NAME=$(az resource list \
+            --resource-group "$RESOURCE_GROUP" \
+            --resource-type Microsoft.Web/staticSites \
+            --query "[0].name" \
+            --output tsv)
+
+          if [ -z "$FUNCTION_APP_NAME" ] || [ -z "$STATIC_WEB_APP_NAME" ]; then
+            echo "Could not resolve Function App or Static Web App in $RESOURCE_GROUP" >&2
+            exit 1
+          fi
+
+          echo "FUNCTION_APP_NAME=$FUNCTION_APP_NAME" >> "$GITHUB_ENV"
+          echo "STATIC_WEB_APP_NAME=$STATIC_WEB_APP_NAME" >> "$GITHUB_ENV"
+
+      - name: Write runtime config
+        run: |
+          node scripts/write-runtime-config.mjs \
+            --mode "${{ inputs.mode }}" \
+            --title "${{ inputs.title }}" \
+            --message "${{ inputs.message }}" \
+            --details "${{ inputs.details }}" \
+            --resume-hint "${{ inputs.resume_hint }}"
+
+      - name: Stop Function App for parking mode
+        if: ${{ inputs.mode == 'park' }}
+        run: |
+          az functionapp stop \
+            --name "$FUNCTION_APP_NAME" \
+            --resource-group "$RESOURCE_GROUP"
+
+      - name: Start Function App for resume mode
+        if: ${{ inputs.mode == 'resume' }}
+        run: |
+          az functionapp start \
+            --name "$FUNCTION_APP_NAME" \
+            --resource-group "$RESOURCE_GROUP"
+
+      - name: Deploy Static Web App
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_SWA_POOLS }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: 'upload'
+          app_location: 'src/web'
+          api_location: ''
+          output_location: ''
+          skip_app_build: true
+
+      - name: Smoke homepage
+        run: |
+          STATIC_WEB_APP_URL=$(az staticwebapp show \
+            --name "$STATIC_WEB_APP_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query "defaultHostname" \
+            --output tsv)
+          curl --fail --silent --show-error "https://${STATIC_WEB_APP_URL}/" > /dev/null
+
+  toggle-production:
+    name: Toggle Parking Mode (Production)
+    if: ${{ inputs.target_environment == 'production' }}
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Set production resource group
+        run: echo "RESOURCE_GROUP=swim-lessons-production-rg" >> "$GITHUB_ENV"
+
+      - name: Azure Login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID_PROD }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID_PROD }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID_PROD }}
+
+      - name: Resolve deployed resource names
+        run: |
+          FUNCTION_APP_NAME=$(az functionapp list \
+            --resource-group "$RESOURCE_GROUP" \
+            --query "[0].name" \
+            --output tsv)
+          STATIC_WEB_APP_NAME=$(az resource list \
+            --resource-group "$RESOURCE_GROUP" \
+            --resource-type Microsoft.Web/staticSites \
+            --query "[0].name" \
+            --output tsv)
+
+          if [ -z "$FUNCTION_APP_NAME" ] || [ -z "$STATIC_WEB_APP_NAME" ]; then
+            echo "Could not resolve Function App or Static Web App in $RESOURCE_GROUP" >&2
+            exit 1
+          fi
+
+          echo "FUNCTION_APP_NAME=$FUNCTION_APP_NAME" >> "$GITHUB_ENV"
+          echo "STATIC_WEB_APP_NAME=$STATIC_WEB_APP_NAME" >> "$GITHUB_ENV"
+
+      - name: Write runtime config
+        run: |
+          node scripts/write-runtime-config.mjs \
+            --mode "${{ inputs.mode }}" \
+            --title "${{ inputs.title }}" \
+            --message "${{ inputs.message }}" \
+            --details "${{ inputs.details }}" \
+            --resume-hint "${{ inputs.resume_hint }}"
+
+      - name: Stop Function App for parking mode
+        if: ${{ inputs.mode == 'park' }}
+        run: |
+          az functionapp stop \
+            --name "$FUNCTION_APP_NAME" \
+            --resource-group "$RESOURCE_GROUP"
+
+      - name: Start Function App for resume mode
+        if: ${{ inputs.mode == 'resume' }}
+        run: |
+          az functionapp start \
+            --name "$FUNCTION_APP_NAME" \
+            --resource-group "$RESOURCE_GROUP"
+
+      - name: Deploy Static Web App
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_SWA_POOLS_PROD }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: 'upload'
+          app_location: 'src/web'
+          api_location: ''
+          output_location: ''
+          skip_app_build: true
+
+      - name: Smoke homepage
+        run: |
+          STATIC_WEB_APP_URL=$(az staticwebapp show \
+            --name "$STATIC_WEB_APP_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query "defaultHostname" \
+            --output tsv)
+          curl --fail --silent --show-error "https://${STATIC_WEB_APP_URL}/" > /dev/null
